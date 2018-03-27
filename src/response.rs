@@ -191,7 +191,9 @@ pub mod parser {
 
 /// Predefined Codes based on RFC 5321
 ///
-/// All documentation is directly quoted from RFC 5321 Section 4.2.3.
+/// All command documentation starting with "RFC XXX:" is directly quoted from the rfx XXX,
+/// command documentation starting with "RFC XXX;" is not quoted.
+/// In case of "RFC 5321:" the quotes come from Section 4.2.3.
 pub mod codes {
     #[allow(non_snake_case)]
     use super::ResponseCode;
@@ -259,6 +261,9 @@ pub mod codes {
     /// RFC 5321: Command parameter not implemented
     pub static PARAMETER_NOT_IMPLEMENTED: ResponseCode = ResponseCode(*b"504");
 
+    /// RFC 7504: Server does not accept mail
+    pub static SERVER_DOES_NOT_ACCEPT_MAIL: ResponseCode = ResponseCode(*b"521");
+
     /// RFC 5321: Requested action not taken: mailbox unavailable (e.g., mailbox
     /// not found, no access, or command rejected for policy reasons)
     pub static MAILBOX_UNAVAILABLE: ResponseCode = ResponseCode(*b"550");
@@ -279,4 +284,9 @@ pub mod codes {
 
     /// RFC 5321: MAIL FROM/RCPT TO parameters not recognized or not implemented
     pub static PARAM_NOT_RECOGNIZED: ResponseCode = ResponseCode(*b"555");
+
+    /// RFC 7504; like 521 but returned when a intermediate gateway knows a server
+    ///  will return 521 when connecting, and therefore does decide not to connect
+    ///  with it at all
+    pub static TARGET_DOES_NOT_ACCEPT_MAIL: ResponseCode = ResponseCode(*b"556");
 }
