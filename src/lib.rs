@@ -34,7 +34,7 @@ impl Connection {
     pub fn simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
         let (mut io, ehlo) = self.destruct();
         {
-            let buffer = io.out_buffer();
+            let buffer = io.out_buffer(1024);
             cmd.write_cmd(buffer);
             buffer.put("\r\n");
         }

@@ -11,7 +11,10 @@ use tokio_tls::TlsStream;
 
 use ::response::{Response, parser};
 
-
+// most responses should fit in 256 bytes
+const INPUT_BUFFER_INC_SIZE: usize = 256;
+// most commands should fit in 1024 bytes (except e.g. DATA/BDAT)
+const OUTPUT_BUFFER_INC_SIZE: usize = 1024;
 
 pub type SmtpResult = Result<Response, Response>;
 
@@ -44,29 +47,49 @@ pub struct Io {
     buffer: Buffers,
 }
 
+#[inline]
+fn reverse_buffer_cap(buf: &mut BytesMut, need_rem: usize, increase: usize) {
+    let rem = buf.remaining_mut();
+    if rem < need_rem {
+        let mut reserve = rem + increase;
+        while reserve < need_rem {
+            reserve += increase;
+        }
+        // this will keep the capacity a multiple of increase,
+        // at last as long as everyone keeps to this schema
+        buf.reserve(reserve)
+    }
+}
+
 impl Io {
-
-    pub fn is_secure(&self) -> bool {
-        self.socket.is_secure()
-    }
-
-    pub fn out_buffer(&mut self) -> &mut BytesMut {
-        &mut self.buffer.output
-    }
-
-    pub fn in_buffer(&mut self) -> &mut BytesMut {
-        &mut self.buffer.input
-    }
 
     pub fn destruct(self) -> (Socket, Buffers) {
         let Io { socket, buffer } = self;
         (socket, buffer)
     }
 
+    pub fn is_secure(&self) -> bool {
+        self.socket.is_secure()
+    }
+
+    pub fn out_buffer(&mut self, need_rem: usize) -> &mut BytesMut {
+        let buf = &mut self.buffer.output;
+        reverse_buffer_cap(buf, need_rem, OUTPUT_BUFFER_INC_SIZE);
+        buf
+    }
+
+    pub fn in_buffer(&mut self) -> &mut BytesMut {
+        &mut self.buffer.input
+    }
+
+
     /// writes <cmd> and then "\r\n" and then calls flush
     pub fn flush_cmd(mut self, cmd: &str) -> Flushing {
-        self.in_buffer().put(cmd);
-        self.in_buffer().put("\r\n");
+        {
+            let out = self.out_buffer(cmd.len() + 2);
+            out.put(cmd);
+            out.put("\r\n");
+        }
         self.flush()
     }
 
@@ -111,15 +134,21 @@ impl Io {
         let input = &mut self.buffer.input;
         let socket = &mut self.socket;
 
+        //TODO limit the buffer size (configurable) to limit smtp response line size
+        // reverse more buffer (this is currently _not_ limited,
+        // through limiting it needs special handling wrt. to
+        // notifying once the buffer is less full)
+        //
+        // if buffer size is not limited in a if-full-error way the containing loop
+        // has to be replicated at the outside including a consumer of the buffer
         loop {
-            //TODO limit the buffer size (configurable) to limit smtp response line size
-            // reverse more buffer (this is currently _not_ limited,
-            // through limiting it needs special handling wrt. to
-            // notifying once the buffer is less full)
-            //
-            // if buffer size is not limited in a if-full-error way the containing loop
-            // has to be replicated at the outside including a consumer of the buffer
-            input.reserve(1024);
+
+            // make sure at last 1 byte can be read to the buffer
+            // (grow the buffer in multiples of INPUT_BUFFER_INC_SIZE)
+            // it's unlikely that this buffer will ever be filled
+            if input.remaining_mut() == 0 {
+                input.reserve(INPUT_BUFFER_INC_SIZE);
+            }
 
             // read as many bytes as possible
             // if not ready then return
@@ -352,6 +381,7 @@ impl Parsing {
                 let response = parser::response_from_parsed_lines(lines.into_iter())?;
 
                 let io = self.inner.take().expect("[BUG] poll after completion");
+                //FIXME[buf_management]: maybe normalize output bufer to have at most cap of 1024
                 return Ok(Some((io, response.into_result())));
 
             } else {
@@ -428,10 +458,10 @@ impl<S> DotStashedWrite<S>
 
         if next.is_none() {
             self.write_eom_seq = true;
-            let stash_state = self.stash_state;
-
-            let out = self.io_mut().out_buffer();
-            if stash_state != CrLf::HitLf {
+            let add_newline = self.stash_state != CrLf::HitLf;
+            let need = 3 + if add_newline { 2 } else { 0 };
+            let out = self.io_mut().out_buffer(need);
+            if add_newline {
                 out.put("\r\n");
             }
             out.put(".\r\n");
@@ -441,10 +471,19 @@ impl<S> DotStashedWrite<S>
     }
 
     fn write_dot_stashed_output(&mut self, unstashed: S::Item) {
-        //write from source into buffer
+        //TODO[buf_management]: scan if unstashed needs stashing and only if so write it, so:
+        //  1. have a "default" buffer (maybe mem::replace(&mut bufer.output, Bytes::new())
+        //  2. have a alternate buffer which is "just" a S::Item
+        //  3. consider using Chain
+        //      - but what is with default -> alternate -> default chains
+        //        (which are potentially broken)
+        //IDEA: have a ChainedRingBuffer chaining slices to a default buffer and already "ready"
+        //      buffers into a chain "ring"
         let mut state = self.stash_state;
         {
-            let out = self.io_mut().out_buffer();
+            let raw_len = unstashed.remaining();
+            let out = self.io_mut().out_buffer(raw_len);
+            let mut over_capacity = out.remaining_mut() - raw_len;
             for bch in unstashed.iter() {
                 let (stash, new_state) = match (bch, state) {
                     (b'\r', CrLf::None) => (false, CrLf::HitCr),
@@ -457,6 +496,13 @@ impl<S> DotStashedWrite<S>
                 };
                 state = new_state;
                 if stash {
+                    if over_capacity == 0 {
+                        //increase buffer capacity
+                        let rem = out.remaining_mut();
+                        out.reserve(rem + OUTPUT_BUFFER_INC_SIZE);
+                        over_capacity += OUTPUT_BUFFER_INC_SIZE;
+                    }
+                    over_capacity -= 1;
                     out.put_u8(b'.');
                 }
                 out.put_u8(bch);
@@ -476,7 +522,7 @@ impl<S> Future for DotStashedWrite<S>
         loop {
             //TODO the think below is needed so to handle put wrt. buffer capacity (it panics
             // if it rans out of capacity)
-            //TODO this can be improved to not flush each slice befor dot-stashing the next slice
+            //TODO this can be improved to not flush each slice before dot-stashing the next slice
             // e.g. while buffer has space write dot stashed bytes from self.pending into
             // out buffer while poll_flush is NotReady
             try_ready!(self.io_mut().poll_flush());
