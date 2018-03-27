@@ -72,8 +72,12 @@ impl From<(Io, Option<EhloData>)> for Connection {
 //  2.1. drawback is that a whole BDAT + DATA package has to fit into the buffer
 pub trait Cmd {
     fn exec(self, con: Connection) -> CmdFuture;
+    fn boxed(self) -> BoxedCmd
+        where Self: Sized + 'static
+    {
+        Box::new(Some(self))
+    }
 }
-
 
 pub trait SimpleCmd {
 
@@ -85,4 +89,32 @@ pub trait SimpleCmd {
     /// write `"\r\n"`.
     ///
     fn write_cmd(&self, buf: &mut BytesMut);
+}
+
+pub type BoxedCmd = Box<TypeErasableCmd>;
+
+pub trait TypeErasableCmd {
+    /// # Panics
+    ///
+    /// panics if called more then once
+    /// (but can't accept `self` instead of `&mut self`
+    /// as it requires object-safety)
+    ///
+    fn _only_once_exec(&mut self, con: Connection) -> CmdFuture;
+}
+
+impl<C> TypeErasableCmd for Option<C>
+    where C: Cmd
+{
+    fn _only_once_exec(&mut self, con: Connection) -> CmdFuture {
+        let me = self.take().expect("_only_once_exec called a second time");
+        me.exec(con)
+    }
+}
+
+impl Cmd for Box<TypeErasableCmd> {
+
+    fn exec(mut self, con: Connection) -> CmdFuture {
+        self._only_once_exec(con)
+    }
 }
