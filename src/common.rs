@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::fmt::{self, Display};
 use std::error::Error;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::ops::Deref;
 
 use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
@@ -52,7 +53,40 @@ impl Into<(Domain, HashMap<Capability, Vec<EhloParam>>)> for EhloData {
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Capability(IgnoreAsciiCaseString);
+pub struct Capability(EsmtpKeyword);
+
+impl Deref for Capability {
+    type Target = EsmtpKeyword;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Borrow<IgnoreAsciiCaseStr> for Capability {
+
+    fn borrow(&self) -> &IgnoreAsciiCaseStr {
+        (self.0).0.as_ref()
+    }
+}
+
+impl From<EsmtpKeyword> for Capability {
+    fn from(keyword: EsmtpKeyword) -> Self {
+        Capability(keyword)
+    }
+}
+
+impl Into<EsmtpKeyword> for Capability {
+    fn into(self) -> EsmtpKeyword {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EsmtpKeyword(IgnoreAsciiCaseString);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EsmtpValue(String);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EhloParam(String);
@@ -61,10 +95,22 @@ pub struct EhloParam(String);
 pub struct Domain(IgnoreAsciiCaseString);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct AddressLiteral(String);
+pub struct AddressLiteral(IgnoreAsciiCaseString);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ForwardPath(String);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ReversePath(Option<String>);
 
 macro_rules! impl_str_wrapper {
     ($($name:ident),*) => ($(
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                self.0.as_ref()
+            }
+        }
 
         impl AsRef<str> for $name {
             fn as_ref(&self) -> &str {
@@ -86,7 +132,7 @@ macro_rules! impl_str_wrapper {
 
         impl<'a> PartialEq<&'a str> for $name {
             fn eq(&self, other: &&'a str) -> bool {
-                &self.0 == other
+                self.0 == *other
             }
         }
 
@@ -99,69 +145,125 @@ macro_rules! impl_str_wrapper {
     )*);
 }
 
-macro_rules! impl_str_no_case_wrapper {
-    ($($name:ident),*) => ($(
-        impl Borrow<IgnoreAsciiCaseStr> for $name {
-            fn borrow(&self) -> &IgnoreAsciiCaseStr {
-                self.0.as_ref()
-            }
-        }
-    )*);
+
+impl_str_wrapper!(Domain, EhloParam, AddressLiteral, EsmtpKeyword, EsmtpValue);
+
+impl ForwardPath {
+
+    /// creates a ForwardPath from a string repr. of an mailbox without checking it
+    ///
+    /// This mothod does not check if the string is grammatically correct
+    pub fn mailbox_unchecked<I>(mailbox: I) -> Self
+        where I: Into<String>
+    {
+        ForwardPath(mailbox.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
-macro_rules! impl_str_case_wrapper {
-    ($($name:ident),*) => ($(
-        impl Borrow<str> for $name {
-            fn borrow(&self) -> &str {
-                self.0.as_ref()
-            }
-        }
-    )*);
+impl ReversePath {
+
+    pub fn empty() -> Self {
+        ReversePath(None)
+    }
+
+    pub fn mailbox_unchecked<I>(mailbox: I) -> Self
+        where I: Into<String>
+    {
+        ReversePath(Some(mailbox.into()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_ref()
+            .map(|os| &**os)
+            .unwrap_or("")
+    }
 }
-
-impl_str_wrapper!(EhloParam, Capability, Domain, AddressLiteral);
-impl_str_no_case_wrapper!(Capability, Domain);
-impl_str_case_wrapper!(EhloParam);
-
 
 impl FromStr for EhloParam {
-    type Err = EhloSyntaxError;
+    type Err = SyntaxError;
 
     fn from_str(inp: &str) -> Result<Self, Self::Err> {
-        let valid = inp.chars().all(|ch| {
-            let cp = ch as u32;
-            33 <= cp && cp <= 126
+        let valid = inp.bytes().all(|bch| {
+            33 <= bch && bch <= 126
         });
 
         if valid {
-            Ok(EhloParam(inp.to_owned()))
+            Ok(EhloParam(inp.to_owned().into()))
         } else {
-            Err(EhloSyntaxError::Param)
+            Err(SyntaxError::Param)
         }
     }
 }
 
+impl EsmtpKeyword {
 
-impl FromStr for Capability {
-    type Err = EhloSyntaxError;
-
-    fn from_str(inp: &str) -> Result<Self, Self::Err> {
-        let mut iter = inp.chars();
-
-        let valid = iter.next()
-            .map(|ch| ch.is_ascii_alphanumeric()).unwrap_or(false)
-            && iter.all(|ch| ch.is_ascii_alphanumeric() || ch == '-');
+    pub fn new<I>(val: I) -> Result<Self, SyntaxError>
+        where I: AsRef<str> + Into<String>
+    {
+        let valid = {
+            let mut iter = val.as_ref().chars();
+            iter.next()
+                .map(|ch| ch.is_ascii_alphanumeric()).unwrap_or(false)
+                && iter.all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+        };
 
         if valid {
-            Ok(Capability(inp.to_uppercase().into()))
+            let mut sfyied: String = val.into();
+            sfyied.make_ascii_uppercase();
+            Ok(EsmtpKeyword(sfyied.into()))
         } else {
-            Err(EhloSyntaxError::Capability)
+            Err(SyntaxError::EsmtpKeyword)
         }
+    }
+}
+
+impl FromStr for EsmtpKeyword {
+    type Err = SyntaxError;
+
+    fn from_str(inp: &str) -> Result<Self, Self::Err> {
+        EsmtpKeyword::new(inp)
+    }
+}
+
+impl EsmtpValue {
+    pub fn new<I>(val: I) -> Result<Self, SyntaxError>
+        where I: AsRef<str> + Into<String>
+    {
+        let valid = val.as_ref().bytes().all(|bch| {
+            33 <= bch && (bch <= 60 || (62 <= bch && bch <= 128))
+        });
+
+        if valid {
+            let sfyied: String = val.into();
+            Ok(EsmtpValue(sfyied.into()))
+        } else {
+            Err(SyntaxError::EsmtpKeyword)
+        }
+    }
+}
+
+impl FromStr for EsmtpValue {
+    type Err = SyntaxError;
+
+    fn from_str(inp: &str) -> Result<Self, Self::Err> {
+        EsmtpValue::new(inp)
+    }
+}
+
+impl FromStr for Capability {
+    type Err = SyntaxError;
+
+    fn from_str(inp: &str) -> Result<Self, Self::Err> {
+        EsmtpKeyword::from_str(inp).map(Capability)
     }
 }
 
 impl FromStr for Domain {
-    type Err = EhloSyntaxError;
+    type Err = SyntaxError;
 
     fn from_str(inp: &str) -> Result<Self, Self::Err> {
         let valid = inp.split(".").all(validate_subdomain);
@@ -169,7 +271,7 @@ impl FromStr for Domain {
         if valid {
             Ok(Domain(inp.to_lowercase().into()))
         } else {
-            Err(EhloSyntaxError::Domain)
+            Err(SyntaxError::Domain)
         }
     }
 }
@@ -184,28 +286,30 @@ fn validate_subdomain(inp: &str) -> bool {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum EhloSyntaxError {
+pub enum SyntaxError {
     Domain,
     Param,
-    Capability,
-    AddressLiteral
+    AddressLiteral,
+    EsmtpValue,
+    EsmtpKeyword,
 }
 
-impl Display for EhloSyntaxError {
+impl Display for SyntaxError {
 
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "{}", self.description())
     }
 }
 
-impl Error for EhloSyntaxError {
+impl Error for SyntaxError {
     fn description(&self) -> &str {
-        use self::EhloSyntaxError::*;
+        use self::SyntaxError::*;
         match *self {
             Domain => "syntax error parsing Domain from str",
             Param => "syntax error parsing Param str",
-            Capability => "syntax error parsing Capability from str",
-            AddressLiteral => "syntax error parsing AddressLiteral from str",
+            EsmtpKeyword => "syntax error parsing esmtp-keyword from str",
+            EsmtpValue => "syntax error parsing esmtp-value from str",
+            AddressLiteral => "syntax error parsing address-literal from str",
         }
     }
 }
@@ -219,7 +323,7 @@ impl AddressLiteral {
     /// tags registered with IANA.
     #[doc(hidden)]
     pub fn custom_literal<AS1, AS2>(standarized_tag: AS1, custom_part: AS2)
-        -> Result<Self, EhloSyntaxError>
+        -> Result<Self, SyntaxError>
         where AS1: AsRef<str>, AS2: AsRef<str>
     {
         let tag = standarized_tag.as_ref();
@@ -228,7 +332,7 @@ impl AddressLiteral {
             && tag.bytes().all(|bch| bch.is_ascii_alphanumeric() || bch == b'-');
 
         if !valid_tag {
-            return Err(EhloSyntaxError::AddressLiteral);
+            return Err(SyntaxError::AddressLiteral);
         }
 
         let custom_part = custom_part.as_ref();
@@ -237,9 +341,9 @@ impl AddressLiteral {
         });
 
         if valid {
-            Ok(AddressLiteral(format!("{}:{}", tag, custom_part)))
+            Ok(AddressLiteral(format!("[{}:{}]", tag, custom_part).into()))
         } else {
-            Err(EhloSyntaxError::AddressLiteral)
+            Err(SyntaxError::AddressLiteral)
         }
     }
 }
@@ -269,18 +373,15 @@ impl From<SocketAddrV6> for AddressLiteral {
 
 impl<'a> From<&'a SocketAddrV4> for AddressLiteral {
     fn from(addr: &'a SocketAddrV4) -> Self {
-        AddressLiteral(format!("{}", addr))
+        AddressLiteral(format!("[{}]", addr).into())
     }
 }
 
 impl<'a> From<&'a SocketAddrV6> for AddressLiteral {
     fn from(addr: &'a SocketAddrV6) -> Self {
-        AddressLiteral(format!("IPv6:{}", addr))
+        AddressLiteral(format!("[IPv6:{}]", addr).into())
     }
 }
-
-
-
 
 #[cfg(test)]
 mod test {
@@ -305,16 +406,14 @@ mod test {
         }
     }
 
-    mod Capabilities {
-        use std::collections::HashMap;
-        use ::ascii::IgnoreAsciiCaseStr;
-        use super::super::Capability;
+    mod EsmtpKeyword {
+        use super::super::EsmtpKeyword;
 
         #[test]
         fn case_insensitive() {
-            let a: Capability = "affen".parse().unwrap();
-            let b: Capability = "AFFEN".parse().unwrap();
-            let c: Capability = "AffEN".parse().unwrap();
+            let a: EsmtpKeyword = "affen".parse().unwrap();
+            let b: EsmtpKeyword = "AFFEN".parse().unwrap();
+            let c: EsmtpKeyword = "AffEN".parse().unwrap();
             assert_eq!(a, b);
             assert_eq!(b, c);
             assert_eq!(a, "aFFen");
@@ -322,10 +421,36 @@ mod test {
 
         #[test]
         fn displayed_uppercase() {
-            let a: Capability = "afFen".parse().unwrap();
+            let a: EsmtpKeyword = "afFen".parse().unwrap();
             let s: String = a.into();
             assert_eq!(s, "AFFEN")
         }
+    }
+
+    mod EsmtpValue {
+        use super::super::EsmtpValue;
+
+        #[test]
+        fn case_sensitive() {
+            let a: EsmtpValue = "affen".parse().unwrap();
+            let b: EsmtpValue = "AFFEN".parse().unwrap();
+            assert_ne!(a, b);
+            assert_ne!(a, "aFFen");
+        }
+
+        #[test]
+        fn displayed_unchanged() {
+            let a: EsmtpValue = "afFen".parse().unwrap();
+            let s: String = a.into();
+            assert_eq!(s, "afFen")
+        }
+
+    }
+
+    mod Capability {
+        use std::collections::HashMap;
+        use ::ascii::IgnoreAsciiCaseStr;
+        use super::super::Capability;
 
         #[test]
         fn has_to_work_with_hashmaps() {
