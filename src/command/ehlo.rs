@@ -5,7 +5,7 @@ use bytes::BufMut;
 use futures::Future;
 
 use ::{
-    Domain, AddressLiteral, EhloData, EhloSyntaxError, EhloParam,
+    Domain, AddressLiteral, EhloData, SyntaxError, EhloParam,
     Cmd, Connection, CmdFuture, Io, Response
 };
 
@@ -51,7 +51,7 @@ impl Cmd for Ehlo {
     }
 }
 
-fn parse_ehlo_response(response: &Response) -> Result<EhloData, EhloSyntaxError> {
+fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
     let lines = response.msg();
     let first = lines.first().expect("response with 0 lines should not");
     //UNWRAP_SAFE: Split has at last one entry
