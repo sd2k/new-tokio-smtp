@@ -14,6 +14,8 @@ use ::io::{Io, Socket, Buffers};
 use ::response::{Response, codes};
 
 
+mod ehlo;
+pub use self::ehlo::Ehlo;
 
 
 macro_rules! impl_simple_command {

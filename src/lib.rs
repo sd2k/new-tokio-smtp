@@ -5,17 +5,20 @@ extern crate tokio;
 extern crate tokio_tls;
 extern crate native_tls;
 
+mod ascii;
+mod common;
 pub mod response;
-pub mod command;
 pub mod io;
-mod ehlo_data;
+pub mod command;
 
-pub use self::ehlo_data::EhloData;
+pub use self::common::*;
+pub use self::io::Io;
+pub use self::response::Response;
 
 use std::{io as std_io};
 use bytes::{BytesMut, BufMut};
 use futures::Future;
-use self::io::{Io, SmtpResult};
+use self::io::SmtpResult;
 
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
 

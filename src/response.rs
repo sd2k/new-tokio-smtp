@@ -7,6 +7,8 @@ pub struct Response {
 
 impl Response {
 
+    //TODO make sure lines has at last one entry, other
+    // parts might panic if there is not at last one entry in lines
     pub fn new(code: ResponseCode, lines: Vec<String>) -> Self {
         Response { code, lines }
     }
