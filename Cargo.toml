@@ -14,3 +14,4 @@ native-tls = "0.1.5"
 [features]
 default = []
 mock_support = []
+mock_impl = ["mock_support"]

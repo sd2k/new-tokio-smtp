@@ -17,6 +17,8 @@ pub mod response;
 pub mod io;
 mod connection;
 pub mod command;
+#[cfg(feature="mock_impl")]
+pub mod mock;
 
 pub use self::data_types::*;
 pub use self::common::*;
