@@ -7,9 +7,9 @@ extern crate native_tls;
 
 mod future_ext;
 mod ascii;
-#[macro_use]
-mod utils;
 mod common;
+#[macro_use]
+mod tls_utils;
 pub mod response;
 pub mod io;
 pub mod command;
@@ -17,6 +17,7 @@ pub mod command;
 pub use self::common::*;
 pub use self::io::Io;
 pub use self::response::Response;
+pub use self::tls_utils::{SetupTlsData, SetupTls};
 
 use std::{io as std_io};
 use std::net::SocketAddr;
@@ -24,9 +25,8 @@ use std::net::SocketAddr;
 use bytes::{BytesMut, BufMut};
 use futures::future::{self, Future};
 
-use self::io::SmtpResult;
-use self::utils::SetupTls;
 use self::future_ext::ResultWithContextExt;
+use self::io::SmtpResult;
 
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
 
@@ -49,12 +49,12 @@ impl Connection {
     }
 
     //TODO[rust/impl Trait]: remove boxing
-    pub fn connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, domain: String, setup_tls: S)
+    pub fn connect_direct_tls_no_ehlo<S>(how: SetupTlsData<S>)
         -> CmdFuture
         where S: SetupTls
     {
         let fut = Io
-            ::connect_secure(addr, domain, setup_tls)
+            ::connect_secure(how)
             .and_then(Io::parse_response)
             .map(|(io, response)| (Connection::from(io), response));
 
@@ -76,7 +76,7 @@ impl Connection {
     }
 
     pub fn connect_direct_tls<S>(
-        addr: &SocketAddr, domain: String, tls_setup: S,
+        how: SetupTlsData<S>,
         clid: ClientIdentity
     ) -> CmdFuture
         where S: SetupTls
@@ -85,7 +85,7 @@ impl Connection {
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
         let fut = Connection
-            ::connect_direct_tls_no_ehlo(addr, domain, tls_setup)
+            ::connect_direct_tls_no_ehlo(how)
             .ctx_and_then(move |con, _| {
                 con.send(Ehlo::from(clid))
             });
@@ -94,7 +94,7 @@ impl Connection {
     }
 
     pub fn connect_starttls<S>(
-        addr: &SocketAddr, domain: String, tls_setup: S,
+        how: SetupTlsData<S>,
         clid: ClientIdentity
     )
         -> CmdFuture
@@ -103,9 +103,10 @@ impl Connection {
         //Note: this has a cicular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::{StartTls, Ehlo};
+        let SetupTlsData { addr, domain, setup } = how;
 
         let fut = Connection
-            ::connect_insecure(addr, clid.clone())
+            ::connect_insecure(&addr, clid.clone())
             .ctx_and_then(|con, _| {
                 if !con.has_capability("STARTTLS") {
                     let fut = future::err(std_io::Error::new(
@@ -115,7 +116,7 @@ impl Connection {
                     Box::new(fut)
                 } else {
                     con.send(StartTls {
-                        setup_tls: tls_setup,
+                        setup_tls: setup,
                         sni_domain: domain
                     })
                 }

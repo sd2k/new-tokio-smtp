@@ -1,24 +1,27 @@
 use std::{io as std_io};
+use std::fmt::Debug;
 
 use futures::future::{self, Either, Future};
 
 use native_tls::{self, TlsConnector, TlsConnectorBuilder};
 use tokio_tls::TlsConnectorExt;
 
-use ::utils::{map_tls_err, SetupTls};
+use ::common::Domain;
+use ::tls_utils::{map_tls_err, SetupTls};
 use ::{Connection, CmdFuture, Cmd};
 use ::io::{Io, Socket, Buffers};
 use ::response::{Response, codes};
 
 
 impl<F: 'static> SetupTls for F
-    where F: FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
+    where F: Debug + FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
 {
     fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
         (self)(builder)
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DefaultSetup;
 
 impl SetupTls for DefaultSetup {
@@ -29,12 +32,12 @@ impl SetupTls for DefaultSetup {
 
 pub struct StartTls<S = DefaultSetup> {
     pub setup_tls: S,
-    pub sni_domain: String,
+    pub sni_domain: Domain,
 }
 
 impl StartTls<DefaultSetup> {
     pub fn new<I>(sni_domain: I) -> Self
-        where I: Into<String>
+        where I: Into<Domain>
     {
         StartTls {
             sni_domain: sni_domain.into(),
@@ -48,7 +51,7 @@ impl<S> StartTls<S>
 {
 
     pub fn new_with_tls_setup<I, F: 'static>(sni_domain: I, setup_tls: S) -> Self
-        where I: Into<String>
+        where I: Into<Domain>
     {
         StartTls {
             setup_tls,
@@ -134,7 +137,7 @@ impl<S> Cmd for StartTls<S>
                     };
 
                     let fut = connector
-                        .connect_async(&sni_domain, stream)
+                        .connect_async(sni_domain.as_str(), stream)
                         .map_err(map_tls_err)
                         .map(move |stream| {
                             let socket = Socket::Secure(stream);

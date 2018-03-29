@@ -268,6 +268,13 @@ impl FromStr for Capability {
     }
 }
 
+impl Domain {
+
+    pub fn new_unchecked(domain: String) -> Self {
+        Domain(domain.into())
+    }
+}
+
 impl FromStr for Domain {
     type Err = SyntaxError;
 
