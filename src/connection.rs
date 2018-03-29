@@ -6,7 +6,13 @@ use futures::future::{self, Future};
 
 use ::future_ext::ResultWithContextExt;
 use ::data_types::EhloData;
-use ::common::{SetupTls, TlsConfig, ClientIdentity};
+use ::common::{
+    ConnectionConfig,
+    ClientIdentity,
+    Security,
+    TlsConfig,
+    SetupTls
+};
 use ::io::{Io, SmtpResult};
 
 
@@ -19,6 +25,23 @@ pub struct Connection {
 
 
 impl Connection {
+
+    pub fn connect<S>(config: ConnectionConfig<S>) -> CmdFuture
+        where S: SetupTls
+    {
+        let ConnectionConfig { addr, security, client_id } = config;
+        match security {
+            Security::None => {
+                Connection::connect_insecure(&addr, client_id)
+            },
+            Security::DirectTls(tls_config) => {
+                Connection::connect_direct_tls(&addr, client_id, tls_config)
+            }
+            Security::StartTls(tls_config) => {
+                Connection::connect_starttls(&addr, client_id, tls_config)
+            }
+        }
+    }
 
     //TODO[rust/impl Trait]: remove boxing
     pub fn connect_insecure_no_ehlo(addr: &SocketAddr) -> CmdFuture {

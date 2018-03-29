@@ -39,22 +39,25 @@ pub struct ConnectionConfig<S = DefaultTlsSetup>
     where S: SetupTls
 {
     pub addr: SocketAddr,
-    pub security: Security<S>
+    pub security: Security<S>,
+    pub client_id: ClientIdentity
 }
 
 impl ConnectionConfig<DefaultTlsSetup> {
 
-    pub fn with_direct_tls(addr: SocketAddr, domain: Domain) -> Self {
+    pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientIdentity) -> Self {
         ConnectionConfig {
             addr,
-            security: Security::DirectTls(domain.into())
+            security: Security::DirectTls(domain.into()),
+            client_id: clid
         }
     }
 
-    pub fn with_starttls(addr: SocketAddr, domain: Domain) -> Self {
+    pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientIdentity) -> Self {
         ConnectionConfig {
             addr,
-            security: Security::StartTls(domain.into())
+            security: Security::StartTls(domain.into()),
+            client_id: clid
         }
     }
 }
