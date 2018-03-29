@@ -11,6 +11,7 @@ use tokio_tls::TlsStream;
 pub enum Socket {
     Secure(TlsStream<TcpStream>),
     Insecure(TcpStream),
+    #[cfg(feature="mock_support")]
     Mock(Box<MockStream>)
 }
 
@@ -20,6 +21,7 @@ impl Socket {
         match *self {
             Socket::Secure(_) => true,
             Socket::Insecure(_) => false,
+            #[cfg(feature="mock_support")]
             Socket::Mock(ref mock) => mock.is_secure()
         }
     }
@@ -30,6 +32,7 @@ macro_rules! socket_mux {
         match *$self {
             Socket::Secure(ref mut $socket) => $block,
             Socket::Insecure(ref mut $socket) => $block,
+            #[cfg(feature="mock_support")]
             Socket::Mock(ref mut $socket) => $block
         }
     });
@@ -63,6 +66,7 @@ impl AsyncRead for Socket {
         match *self {
             Socket::Secure(ref socket) => socket.prepare_uninitialized_buffer(buf),
             Socket::Insecure(ref socket) => socket.prepare_uninitialized_buffer(buf),
+            #[cfg(feature="mock_support")]
             Socket::Mock(ref socket) => socket.prepare_uninitialized_buffer(buf)
         }
     }

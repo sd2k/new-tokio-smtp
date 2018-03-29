@@ -92,6 +92,14 @@ fn map_tls_err(err: native_tls::Error) -> std_io::Error {
     )
 }
 
+fn connection_already_secure_error_future() -> CmdFuture {
+    let fut = future::err(std_io::Error::new(
+        std_io::ErrorKind::AlreadyExists,
+        "connection is already TLS encrypted"
+    ));
+    return Box::new(fut);
+}
+
 impl<S> Cmd for StartTls<S>
     where S: SetupTls
 {
@@ -105,17 +113,18 @@ impl<S> Cmd for StartTls<S>
                 Socket::Insecure(_) => {
                     false
                 },
+                #[cfg(feature="mock_support")]
                 Socket::Mock(ref mut socket_mock) if !socket_mock.is_secure() => {
                     socket_mock.set_is_secure(true);
                     true
                 }
-                Socket::Secure(_) |
-                Socket::Mock(_) => {
-                    let fut = future::err(std_io::Error::new(
-                        std_io::ErrorKind::AlreadyExists,
-                        "connection is already TLS encrypted"
-                    ));
-                    return Box::new(fut);
+                #[cfg(feature="mock_support")]
+                Socket::Secure(_) | Socket::Mock(_) => {
+                    return connection_already_secure_error_future();
+                }
+                #[cfg(not(feature="mock_support"))]
+                Socket::Secure(_) => {
+                    return connection_already_secure_error_future();
                 },
             };
 
