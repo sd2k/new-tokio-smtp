@@ -62,6 +62,17 @@ impl<S> StartTls<S>
     }
 }
 
+/// STARTTLS is the only command which does not have a "final" response,
+/// after it's intermediate response it will start the tls handchake and
+/// after that nothing is ever send back, but this API _always_ has a
+/// response for a request, so we create a "fake" response (`"220 Ready"`)
+fn tls_done_result() -> Response {
+    Response::new(
+        codes::READY,
+        vec![ "Ready".to_owned() ]
+    )
+}
+
 
 //FIXME[rust/catch]: use catch once in stable
 macro_rules! alttry {
@@ -86,14 +97,31 @@ impl<S> Cmd for StartTls<S>
 {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (io, ehlo_data) = con.destruct();
+        let (mut io, ehlo_data) = con.destruct();
         let StartTls { sni_domain, setup_tls } = self;
 
-        if io.is_secure() {
-            let fut = future::err(std_io::Error::new(
-                std_io::ErrorKind::AlreadyExists,
-                "connection is already TLS encrypted"
-            ));
+        let was_mock =
+            match *io.socket_mut() {
+                Socket::Insecure(_) => {
+                    false
+                },
+                Socket::Mock(ref mut socket_mock) if !socket_mock.is_secure() => {
+                    socket_mock.set_is_secure(true);
+                    true
+                }
+                Socket::Secure(_) |
+                Socket::Mock(_) => {
+                    let fut = future::err(std_io::Error::new(
+                        std_io::ErrorKind::AlreadyExists,
+                        "connection is already TLS encrypted"
+                    ));
+                    return Box::new(fut);
+                },
+            };
+
+        if was_mock {
+            let con = Connection::from((io, ehlo_data));
+            let fut = future::ok((con, Ok(tls_done_result())));
             return Box::new(fut);
         }
 
@@ -126,11 +154,7 @@ impl<S> Cmd for StartTls<S>
                             let socket = Socket::Secure(stream);
                             let io = Io::from((socket, Buffers::new()));
                             let con = Connection::from((io, None));
-                            let response = Ok(Response::new(
-                                codes::READY,
-                                vec![ "ready".into() ]
-                            ));
-                            (con, response)
+                            (con, Ok(tls_done_result()))
                         });
 
                     Either::B(fut)

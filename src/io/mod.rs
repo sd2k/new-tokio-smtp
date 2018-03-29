@@ -44,6 +44,14 @@ impl Io {
         (socket, buffer)
     }
 
+    pub fn socket_mut(&mut self) -> &mut Socket {
+        &mut self.socket
+    }
+
+    pub fn socket(&self) -> &Socket {
+        &self.socket
+    }
+
     pub fn is_secure(&self) -> bool {
         self.socket.is_secure()
     }
@@ -95,10 +103,3 @@ fn reverse_buffer_cap(buf: &mut BytesMut, need_rem: usize, increase: usize) {
         buf.reserve(reserve)
     }
 }
-
-//pub trait MockStream: Debug + AsyncRead + AsyncWrite + 'static {
-//    fn is_secure(&self) -> bool {
-//        false
-//    }
-//}
-

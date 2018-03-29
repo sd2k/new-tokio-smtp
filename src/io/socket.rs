@@ -1,4 +1,5 @@
 use std::io as std_io;
+use std::fmt::Debug;
 
 use futures::Poll;
 use bytes::buf::{Buf, BufMut};
@@ -10,7 +11,7 @@ use tokio_tls::TlsStream;
 pub enum Socket {
     Secure(TlsStream<TcpStream>),
     Insecure(TcpStream),
-    //Mock(Box<MockStream>)
+    Mock(Box<MockStream>)
 }
 
 impl Socket {
@@ -19,7 +20,7 @@ impl Socket {
         match *self {
             Socket::Secure(_) => true,
             Socket::Insecure(_) => false,
-            //Socket::Mock(ref mock) => mock.is_secure()
+            Socket::Mock(ref mock) => mock.is_secure()
         }
     }
 }
@@ -29,7 +30,7 @@ macro_rules! socket_mux {
         match *$self {
             Socket::Secure(ref mut $socket) => $block,
             Socket::Insecure(ref mut $socket) => $block,
-            //Socket::Mock(ref mut $socket) => $block
+            Socket::Mock(ref mut $socket) => $block
         }
     });
 }
@@ -62,7 +63,7 @@ impl AsyncRead for Socket {
         match *self {
             Socket::Secure(ref socket) => socket.prepare_uninitialized_buffer(buf),
             Socket::Insecure(ref socket) => socket.prepare_uninitialized_buffer(buf),
-            //Socket::Mock(ref mut $socket) => $block
+            Socket::Mock(ref socket) => socket.prepare_uninitialized_buffer(buf)
         }
     }
 
@@ -109,4 +110,11 @@ impl AsyncWrite for Socket {
             AsyncWrite::write_buf(socket, buf)
         }}
     }
+}
+
+pub trait MockStream: Debug + AsyncRead + AsyncWrite + 'static {
+    fn is_secure(&self) -> bool {
+        false
+    }
+    fn set_is_secure(&mut self, secure: bool);
 }
