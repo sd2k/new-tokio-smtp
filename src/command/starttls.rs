@@ -5,14 +5,11 @@ use futures::future::{self, Either, Future};
 use native_tls::{self, TlsConnector, TlsConnectorBuilder};
 use tokio_tls::TlsConnectorExt;
 
+use ::utils::{map_tls_err, SetupTls};
 use ::{Connection, CmdFuture, Cmd};
 use ::io::{Io, Socket, Buffers};
 use ::response::{Response, codes};
 
-
-pub trait SetupTls: 'static {
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>;
-}
 
 impl<F: 'static> SetupTls for F
     where F: FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
@@ -31,8 +28,8 @@ impl SetupTls for DefaultSetup {
 }
 
 pub struct StartTls<S = DefaultSetup> {
-    setup_tls: S,
-    sni_domain: String,
+    pub setup_tls: S,
+    pub sni_domain: String,
 }
 
 impl StartTls<DefaultSetup> {
@@ -71,24 +68,6 @@ fn tls_done_result() -> Response {
     )
 }
 
-
-//FIXME[rust/catch]: use catch once in stable
-macro_rules! alttry {
-    ($block:block => $emap:expr) => ({
-        let func = move || -> Result<_, _> { $block };
-        match func() {
-            Ok(ok)  => ok,
-            Err(err) => return ($emap)(err)
-        }
-    });
-}
-
-fn map_tls_err(err: native_tls::Error) -> std_io::Error {
-    std_io::Error::new(
-        std_io::ErrorKind::Other,
-        err
-    )
-}
 
 fn connection_already_secure_error_future() -> CmdFuture {
     let fut = future::err(std_io::Error::new(

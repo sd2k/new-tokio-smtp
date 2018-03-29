@@ -19,9 +19,14 @@ pub use self::io::Io;
 pub use self::response::Response;
 
 use std::{io as std_io};
+use std::net::SocketAddr;
+
 use bytes::{BytesMut, BufMut};
-use futures::Future;
+use futures::future::{self, Future};
+
 use self::io::SmtpResult;
+use self::utils::SetupTls;
+use self::future_ext::ResultWithContextExt;
 
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
 
@@ -32,6 +37,95 @@ pub struct Connection {
 
 
 impl Connection {
+
+    //TODO[rust/impl Trait]: remove boxing
+    pub fn connect_insecure_no_ehlo(addr: &SocketAddr) -> CmdFuture {
+        let fut = Io
+            ::connect_insecure(addr)
+            .and_then(Io::parse_response)
+            .map(|(io, response)| (Connection::from(io), response));
+
+        Box::new(fut)
+    }
+
+    //TODO[rust/impl Trait]: remove boxing
+    pub fn connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, domain: String, setup_tls: S)
+        -> CmdFuture
+        where S: SetupTls
+    {
+        let fut = Io
+            ::connect_secure(addr, domain, setup_tls)
+            .and_then(Io::parse_response)
+            .map(|(io, response)| (Connection::from(io), response));
+
+        Box::new(fut)
+    }
+
+    pub fn connect_insecure(addr: &SocketAddr, clid: ClientIdentity) -> CmdFuture {
+        //Note: this has a cicular dependency between Connection <-> cmd Ehlo which
+        // could be resolved using a ext. trait, but it's more ergonomic this way
+        use command::Ehlo;
+        let fut = Connection
+            ::connect_insecure_no_ehlo(addr)
+            .ctx_and_then(move |con, _| {
+                con.cmd(Ehlo::from(clid))
+            });
+
+
+        Box::new(fut)
+    }
+
+    pub fn connect_direct_tls<S>(
+        addr: &SocketAddr, domain: String, tls_setup: S,
+        clid: ClientIdentity
+    ) -> CmdFuture
+        where S: SetupTls
+    {
+        //Note: this has a cicular dependency between Connection <-> cmd Ehlo which
+        // could be resolved using a ext. trait, but it's more ergonomic this way
+        use command::Ehlo;
+        let fut = Connection
+            ::connect_direct_tls_no_ehlo(addr, domain, tls_setup)
+            .ctx_and_then(move |con, _| {
+                con.cmd(Ehlo::from(clid))
+            });
+
+        Box::new(fut)
+    }
+
+    pub fn connect_starttls<S>(
+        addr: &SocketAddr, domain: String, tls_setup: S,
+        clid: ClientIdentity
+    )
+        -> CmdFuture
+        where S: SetupTls
+    {
+        //Note: this has a cicular dependency between Connection <-> cmd StartTls/Ehlo which
+        // could be resolved using a ext. trait, but it's more ergonomic this way
+        use command::{StartTls, Ehlo};
+
+        let fut = Connection
+            ::connect_insecure(addr, clid.clone())
+            .ctx_and_then(|con, _| {
+                if !con.has_capability("STARTTLS") {
+                    let fut = future::err(std_io::Error::new(
+                        std_io::ErrorKind::Other,
+                        "server does not support STARTTLS"
+                    ));
+                    Box::new(fut)
+                } else {
+                    con.cmd(StartTls {
+                        setup_tls: tls_setup,
+                        sni_domain: domain
+                    })
+                }
+            })
+            .ctx_and_then(|con, _| {
+                con.cmd(Ehlo::from(clid))
+            });
+
+        Box::new(fut)
+    }
 
     pub fn cmd<C: Cmd>(self, cmd: C) -> CmdFuture {
         cmd.exec(self)
@@ -53,9 +147,41 @@ impl Connection {
         Box::new(fut)
     }
 
+    /// returns true if the capability is known to be supported, false elsewise
+    ///
+    /// The capability is know to be supported if the connection has EhloData and
+    /// it was in the ehlo data (as a ehlo-keyword in one of the ehlo-lines after
+    /// the first response line).
+    ///
+    /// If the connection has no ehlo data or the capability is not in the ehlo
+    /// data false is returned.
+    pub fn has_capability<C>(&self, cap: C) -> bool
+        where C: AsRef<str>
+    {
+        self.ehlo.as_ref().map(|ehlo| {
+            ehlo.has_capability(cap)
+        }).unwrap_or(false)
+    }
+
+    pub fn ehlo_data(&self) -> Option<&EhloData> {
+        self.ehlo.as_ref()
+    }
+
     pub fn destruct(self) -> (Io, Option<EhloData>) {
         let Connection { io, ehlo } = self;
         (io, ehlo)
+    }
+}
+
+impl From<Io> for Connection {
+    fn from(io: Io) -> Self {
+        Connection { io, ehlo: None }
+    }
+}
+
+impl From<(Io, EhloData)> for Connection {
+    fn from((io, ehlo): (Io, EhloData)) -> Self {
+        Connection { io, ehlo: Some(ehlo) }
     }
 }
 
