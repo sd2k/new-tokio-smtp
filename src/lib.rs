@@ -7,6 +7,8 @@ extern crate native_tls;
 
 mod future_ext;
 mod ascii;
+#[macro_use]
+mod utils;
 mod common;
 pub mod response;
 pub mod io;

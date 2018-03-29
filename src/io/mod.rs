@@ -1,6 +1,9 @@
 use bytes::BytesMut;
 use bytes::buf::BufMut;
 
+use tokio_tls::TlsStream;
+use tokio::net::TcpStream;
+
 use ::response::Response;
 
 
@@ -16,6 +19,8 @@ pub use self::parse_result::*;
 mod dot_stashing;
 pub use self::dot_stashing::*;
 
+mod connect;
+pub use self::connect::*;
 
 // most responses should fit in 256 bytes
 const INPUT_BUFFER_INC_SIZE: usize = 256;
@@ -73,6 +78,23 @@ impl From<(Socket, Buffers)> for Io {
         Io { socket, buffer }
     }
 }
+
+impl From<TcpStream> for Io {
+    fn from(stream: TcpStream) -> Self {
+        let socket = Socket::Insecure(stream);
+        let buffers = Buffers::new();
+        Io::from((socket, buffers))
+    }
+}
+
+impl From<TlsStream<TcpStream>> for Io {
+    fn from(stream: TlsStream<TcpStream>) -> Self {
+        let socket = Socket::Secure(stream);
+        let buffers = Buffers::new();
+        Io::from((socket, buffers))
+    }
+}
+
 
 #[derive(Debug)]
 pub struct Buffers {
