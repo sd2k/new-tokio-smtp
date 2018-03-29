@@ -50,7 +50,7 @@ impl<S> StartTls<S>
 /// response for a request, so we create a "fake" response (`"220 Ready"`)
 fn tls_done_result() -> Response {
     Response::new(
-        codes::READY,
+        codes::STATUS_RESPONSE,
         vec![ "Ready".to_owned() ]
     )
 }
