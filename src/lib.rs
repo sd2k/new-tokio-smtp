@@ -5,6 +5,7 @@ extern crate tokio;
 extern crate tokio_tls;
 extern crate native_tls;
 
+mod future_ext;
 mod ascii;
 mod common;
 pub mod response;
