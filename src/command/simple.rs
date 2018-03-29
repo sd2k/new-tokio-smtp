@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use bytes::{BytesMut, BufMut};
 use common::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
 
-// cyclic dep. for double dispatch ergonomics
 use ::{Connection, CmdFuture, Cmd, SimpleCmd};
 
 const CR_LF: &str = "\r\n";

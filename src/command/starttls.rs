@@ -5,8 +5,6 @@ use futures::future::{self, Either, Future};
 use native_tls::{self, TlsConnector, TlsConnectorBuilder};
 use tokio_tls::TlsConnectorExt;
 
-
-// cyclic dep. for double dispatch ergonomics
 use ::{Connection, CmdFuture, Cmd};
 use ::io::{Io, Socket, Buffers};
 use ::response::{Response, codes};

@@ -4,9 +4,6 @@ use bytes::Buf;
 use futures::future::{self, Either, Future};
 use futures::stream::Stream;
 
-
-
-// cyclic dep. for double dispatch ergonomics
 use ::{Connection, CmdFuture, Cmd, Io};
 use ::response::codes;
 
