@@ -39,8 +39,8 @@ pub type Params = HashMap<EsmtpKeyword, Option<EsmtpValue>>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Mail {
-    reverse_path: ReversePath,
-    params: Params
+    pub reverse_path: ReversePath,
+    pub params: Params
 }
 
 
@@ -48,18 +48,18 @@ pub struct Mail {
 pub struct Recipient {
     //Grammar: "<Postmaster@" Domain ">" / "<Postmaster>" / forward-path
     //Note: that Postmaster is case-sensitive
-    forward_path: ForwardPath,
-    params: Params
+    pub forward_path: ForwardPath,
+    pub params: Params
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Verify {
-    query: String
+    pub query: String
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Help {
-    topic: Option<String>
+    pub topic: Option<String>
 }
 
 impl_simple_command! {
