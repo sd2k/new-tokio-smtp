@@ -68,7 +68,7 @@ impl Connection {
         let fut = Connection
             ::connect_insecure_no_ehlo(addr)
             .ctx_and_then(move |con, _| {
-                con.cmd(Ehlo::from(clid))
+                con.send(Ehlo::from(clid))
             });
 
 
@@ -87,7 +87,7 @@ impl Connection {
         let fut = Connection
             ::connect_direct_tls_no_ehlo(addr, domain, tls_setup)
             .ctx_and_then(move |con, _| {
-                con.cmd(Ehlo::from(clid))
+                con.send(Ehlo::from(clid))
             });
 
         Box::new(fut)
@@ -114,24 +114,24 @@ impl Connection {
                     ));
                     Box::new(fut)
                 } else {
-                    con.cmd(StartTls {
+                    con.send(StartTls {
                         setup_tls: tls_setup,
                         sni_domain: domain
                     })
                 }
             })
             .ctx_and_then(|con, _| {
-                con.cmd(Ehlo::from(clid))
+                con.send(Ehlo::from(clid))
             });
 
         Box::new(fut)
     }
 
-    pub fn cmd<C: Cmd>(self, cmd: C) -> CmdFuture {
+    pub fn send<C: Cmd>(self, cmd: C) -> CmdFuture {
         cmd.exec(self)
     }
 
-    pub fn simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
+    pub fn send_simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
         let (mut io, ehlo) = self.destruct();
         {
             let buffer = io.out_buffer(1024);

@@ -13,7 +13,7 @@ macro_rules! impl_simple_command {
         impl Cmd for $name {
             #[inline]
             fn exec(self, con: Connection) -> CmdFuture {
-                con.simple_cmd(self)
+                con.send_simple_cmd(self)
             }
         }
 
