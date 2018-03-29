@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::{BytesMut, BufMut};
-use common::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
+use data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
 
 use ::{Connection, CmdFuture, Cmd, SimpleCmd};
 

@@ -1,47 +1,31 @@
 use std::{io as std_io};
-use std::fmt::Debug;
 
 use futures::future::{self, Either, Future};
 
-use native_tls::{self, TlsConnector, TlsConnectorBuilder};
+use native_tls::TlsConnector;
 use tokio_tls::TlsConnectorExt;
 
-use ::common::Domain;
-use ::tls_utils::{map_tls_err, SetupTls};
+use ::data_types::Domain;
+use ::common::{map_tls_err, SetupTls, DefaultTlsSetup};
 use ::{Connection, CmdFuture, Cmd};
 use ::io::{Io, Socket, Buffers};
 use ::response::{Response, codes};
 
 
-impl<F: 'static> SetupTls for F
-    where F: Debug + FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
-{
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
-        (self)(builder)
-    }
-}
 
-#[derive(Debug, Clone)]
-pub struct DefaultSetup;
 
-impl SetupTls for DefaultSetup {
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
-        builder.build()
-    }
-}
-
-pub struct StartTls<S = DefaultSetup> {
+pub struct StartTls<S = DefaultTlsSetup> {
     pub setup_tls: S,
     pub sni_domain: Domain,
 }
 
-impl StartTls<DefaultSetup> {
+impl StartTls<DefaultTlsSetup> {
     pub fn new<I>(sni_domain: I) -> Self
         where I: Into<Domain>
     {
         StartTls {
             sni_domain: sni_domain.into(),
-            setup_tls: DefaultSetup
+            setup_tls: DefaultTlsSetup
         }
     }
 }

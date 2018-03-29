@@ -6,7 +6,7 @@ use tokio::net::{TcpStream, ConnectFuture};
 use tokio_tls::TlsConnectorExt;
 use native_tls::TlsConnector;
 
-use ::tls_utils::{map_tls_err, SetupTls, SetupTlsData};
+use ::common::{map_tls_err, SetupTls, TlsConfig};
 use super::Io;
 
 
@@ -22,11 +22,11 @@ impl Io {
     }
 
     //FIXME[rust/impl Trait]: use -> impl Future<Item=Io, Error=std_io::Error>
-    pub fn connect_secure<S>(how: SetupTlsData<S>)
+    pub fn connect_secure<S>(addr: &SocketAddr, config: TlsConfig<S>)
         -> Box<Future<Item=Io, Error=std_io::Error> + 'static>
         where S: SetupTls
     {
-        let SetupTlsData { addr, domain, setup } = how;
+        let TlsConfig { domain, setup } = config;
         let connector = alttry!(
             {
                 setup.setup(TlsConnector::builder()?)

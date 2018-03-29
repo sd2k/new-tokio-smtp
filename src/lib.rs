@@ -10,16 +10,16 @@ extern crate native_tls;
 // up in the list
 mod future_ext;
 mod ascii;
-mod common;
+mod data_types;
 #[macro_use]
-mod tls_utils;
+mod common;
 pub mod response;
 pub mod io;
 mod connection;
 pub mod command;
 
+pub use self::data_types::*;
 pub use self::common::*;
-pub use self::tls_utils::{SetupTlsData, SetupTls};
 pub use self::response::Response;
 pub use self::io::Io;
 pub use self::connection::*;
