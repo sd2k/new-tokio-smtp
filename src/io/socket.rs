@@ -57,12 +57,14 @@ impl std_io::Write for Socket {
 }
 
 impl AsyncRead for Socket {
-//    #[inline]
-//    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-//        socket_mux! {self, |socket| {
-//            socket.prepare_uninitialized_buffer(buf)
-//        }}
-//    }
+    #[inline]
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        match *self {
+            Socket::Secure(ref socket) => socket.prepare_uninitialized_buffer(buf),
+            Socket::Insecure(ref socket) => socket.prepare_uninitialized_buffer(buf),
+            //Socket::Mock(ref mut $socket) => $block
+        }
+    }
 
     #[inline]
     fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
