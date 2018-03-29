@@ -9,6 +9,12 @@ use std::ops::Deref;
 
 use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
+#[derive(Debug, Clone)]
+pub enum ClientIdentity {
+    Domain(Domain),
+    AddressLiteral(AddressLiteral)
+}
+
 pub struct EhloData {
     domain: Domain,
     data: HashMap<Capability, Vec<EhloParam>>

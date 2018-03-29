@@ -5,15 +5,33 @@ use bytes::BufMut;
 use futures::Future;
 
 use ::{
-    Domain, AddressLiteral, EhloData, SyntaxError, EhloParam,
-    Cmd, Connection, CmdFuture, Io, Response
+    Domain, EhloData, SyntaxError, EhloParam,
+    Cmd, Connection, CmdFuture, Io, Response, ClientIdentity
 };
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Ehlo {
-    Domain(Domain),
-    AddressLiteral(AddressLiteral)
+#[derive(Debug, Clone)]
+pub struct Ehlo {
+    identity: ClientIdentity
+}
+
+impl Ehlo {
+
+    pub fn identity(&self) -> &ClientIdentity {
+        &self.identity
+    }
+}
+
+impl From<ClientIdentity> for Ehlo {
+    fn from(identity: ClientIdentity) -> Self {
+        Ehlo { identity }
+    }
+}
+
+impl Into<ClientIdentity> for Ehlo {
+    fn into(self) -> ClientIdentity {
+        self.identity
+    }
 }
 
 impl Cmd for Ehlo {
@@ -21,9 +39,9 @@ impl Cmd for Ehlo {
     fn exec(self, con: Connection) -> CmdFuture {
         let (mut io, _ehlo) = con.destruct();
 
-        let str_me: String = match self {
-            Ehlo::Domain(domain) => domain.into(),
-            Ehlo::AddressLiteral(addrl) => addrl.into()
+        let str_me = match *self.identity() {
+            ClientIdentity::Domain(ref domain) => domain.as_str(),
+            ClientIdentity::AddressLiteral(ref addr_lit) => addr_lit.as_str()
         };
 
         {
