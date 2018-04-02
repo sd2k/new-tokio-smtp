@@ -35,6 +35,8 @@ impl Io {
             output.advance(n);
         }
 
+        try_ready!(socket.poll_flush());
+
         Ok(Async::Ready(()))
     }
 }
