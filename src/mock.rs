@@ -358,9 +358,15 @@ impl AsyncWrite for MockSocket {
                 panic!("tried to write to socket while it should only read from it")
             },
             State::NeedNewAction { waker, buffer } => {
-                self.state = self.prepare_next(waker, buffer);
-                self.schedule_delayed_wake();
-                Ok(Async::NotReady)
+                //poll flush on NeedNewAction + empty conversation should _not_ panic
+                if self.conversation.is_empty() {
+                    assert!(buffer.is_empty());
+                    Ok(Async::Ready(()))
+                } else {
+                    self.state = self.prepare_next(waker, buffer);
+                    self.schedule_delayed_wake();
+                    Ok(Async::NotReady)
+                }
             }
             State::ClientIsWorking { expected, waker, mut input } => {
                 // first: if !expected.starts_with(input) => assert panic
