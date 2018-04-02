@@ -11,7 +11,9 @@ tokio-io = "0.1"
 tokio-tls = "0.1.4"
 native-tls = "0.1.5"
 
+rand = { version="0.4.2", optional=true }
+
 [features]
 default = []
 mock_support = []
-mock_impl = ["mock_support"]
+mock_impl = ["mock_support", "rand"]

@@ -4,6 +4,8 @@ extern crate bytes;
 extern crate tokio;
 extern crate tokio_tls;
 extern crate native_tls;
+#[cfg(feature="mock_impl")]
+extern crate rand;
 
 // order of modules is also "order" in dependency-tree
 // i.e. module should only import from modules hither
