@@ -160,7 +160,9 @@ impl MockSocket {
         }
     }
 
-    pub fn no_assert_drop(mut self) {
+    /// sets the state to `ShutdownOrPoison` and clears the conversation
+    pub fn clear(&mut self) {
+        self.conversation.clear();
         self.state = State::ShutdownOrPoison;
     }
 
