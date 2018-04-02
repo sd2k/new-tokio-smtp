@@ -15,21 +15,31 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use ::io::MockStream;
 
+/// Represents if the action is taken by `Client` or `Server`
 #[derive(Debug)]
 pub enum Actor {
     Server,
     Client
 }
 
+/// the data send by Client/Server
 #[derive(Debug)]
 pub enum ActionData {
+    /// a number of lines, not containing trailing "\r\n"
+    ///
+    /// The trailing "\r\n" will be added implicitly
     Lines(Vec<&'static str>),
+    /// A blob of bytes
     Blob(Vec<u8>)
 }
 
 impl ActionData {
 
-    fn len(&self) -> usize {
+    /// returns the len of the data
+    ///
+    /// In case of `ActionData::Lines` the implied `"\r\n"` line
+    /// endings are added into the length (i.e. len +2 for each line).
+    pub fn len(&self) -> usize {
         match *self {
             ActionData::Blob(ref blob) => blob.len(),
             ActionData::Lines(ref lines) => {
@@ -39,7 +49,7 @@ impl ActionData {
         }
     }
 
-    fn assert_same_start(&self, other: &[u8]) {
+    pub fn assert_same_start(&self, other: &[u8]) {
 
         match *self {
             ActionData::Blob(ref blob) => {
@@ -114,9 +124,27 @@ pub struct MockSocket {
     state: State
 }
 
-
+/// MockSocket going through a pre-coded interlocked clinet-server conversation
+///
+/// The `client` is the part of the programm reading to the socked using `poll_read`
+/// and writing using `poll_write`, the server is the mock doing thinks in reserve,
+/// i.e. reading when the client writes and writing when the server reads.
+///
+/// Internally it has following states:
+///
+/// - `ShutdownOrPoison`, it was shutdown or paniced at some point
+/// - `ClientIsWorking`, the client is sending data and the server checks if it is
+///   what it expects
+/// - `ServerIsWorking`, the server sends back an pre-coded response
+/// - `NeedNewAction`, the previous action was completed and a new one is needed
+///
 impl MockSocket {
 
+    /// create a new `MockSocket` from a sequence of "actions"
+    ///
+    /// Actions are taken interlocked between `Client` (client write something, server reads)
+    /// and `Server` (server writes something, client reads), which is one of the main
+    /// limitations of the Mock implementation.
     pub fn new(conversation: Vec<(Actor, ActionData)>) -> Self {
         let mut conversation = conversation;
         //queue => stack
@@ -134,7 +162,6 @@ impl MockSocket {
 
     pub fn no_assert_drop(mut self) {
         self.state = State::ShutdownOrPoison;
-        mem::drop(self);
     }
 
     fn schedule_delayed_wake(&mut self) {
@@ -143,7 +170,13 @@ impl MockSocket {
             .unwrap()
     }
 
-    fn maybe_inject_not_ready(&mut self) -> Poll<(), std_io::Error> {
+    /// has a 1/16 chance to return `NotReady` and shedule the current `Task` to be notified later
+    ///
+    /// This is used to emulate that the connection is sometimes not ready jet
+    /// e.g. because of network atencies. Yes, this makes the tests not 100% determenistic,
+    /// but to get them in that direction and still test delays without hand encoding them
+    /// would requires using something similar to `quick check`
+    pub fn maybe_inject_not_ready(&mut self) -> Poll<(), std_io::Error> {
         // 1/16 chance to be not ready
         if random::<u8>() >= 240 {
             self.schedule_delayed_wake();
@@ -153,6 +186,20 @@ impl MockSocket {
         }
     }
 
+    /// creates the next state for given `waker` and `buffer`
+    ///
+    /// pop's the next action in the conversation if it's
+    /// a `Server` action the returned state will be and
+    /// `ServerIsWorking` state and the data of the action
+    /// was fully written to the `buffer`. If it's a `Client`
+    /// action a `ClientIsWorking` stat is returned.
+    ///
+    /// # Panics
+    ///
+    /// - if the conversation is done, i.e. if it is empty
+    /// - the next state is a `Server` state and the passed in
+    ///   buffer is not empty
+    ///
     fn prepare_next(&mut self, waker: Waker, buffer: BytesMut) -> State {
 
         let (actor, data) = self.conversation.pop()
@@ -197,6 +244,13 @@ impl MockSocket {
 
 impl Drop for MockSocket {
 
+    /// `drop` impl
+    ///
+    /// # Implementation Detail
+    ///
+    /// if the thread is not panicking it will panic:
+    /// - if the socket was not shutdown
+    /// - if the conversation did not end, i.e. was not empty
     fn drop(&mut self) {
         if !thread::panicking() {
             if let State::ShutdownOrPoison = self.state {}
@@ -216,36 +270,6 @@ impl MockStream for MockSocket {
         self.fake_secure = secure;
     }
 }
-
-// before read/write:
-//   read/write --> state == NeedNewAction --> prepare next action
-//
-// on read:
-//   read --> Actor == Server -> part of  buffer into read -> return bytes transmitted
-//        |                                 \-> state = NeedNewAction
-//        |
-//        \-> Actor == Client -> would Block / panic?
-//
-// on write:
-//   write --> Actor == Client -> read from buffer -> return ...
-//         |                          \-> if "end condition"
-//         |                                \-> assert read input == expected input
-//         |                                       \-> state = NeedNewAction
-//         |
-//         \-> Actor == Server -> would Block / panic?
-//
-// "end condition"
-//    1st: read length >= expected read length
-//    2nd: alt condition "\r\n.\r\n" read?
-//
-// inject NotReady return:
-//   on before read
-//   on read after transmitting >= 1 byte
-//   on before write
-//   on write after trasmitting >= 1 byte
-//
-// on NotReady return:
-//   send Task to DelayedWakerThread
 
 macro_rules! try_ready_or_would_block {
     ($expr:expr) => ({
@@ -280,8 +304,50 @@ impl Write for MockSocket {
     }
 }
 
+
+// before read/write:
+//   read/write --> state == NeedNewAction --> prepare next action
+//
+// on read:
+//   read --> Actor == Server -> part of  buffer into read -> return bytes transmitted
+//        |                                 \-> state = NeedNewAction
+//        |
+//        \-> Actor == Client -> would Block / panic?
+//
+// on write:
+//   write --> Actor == Client -> read from buffer -> return ...
+//         |                          \-> if "end condition"
+//         |                                \-> assert read input == expected input
+//         |                                       \-> state = NeedNewAction
+//         |
+//         \-> Actor == Server -> would Block / panic?
+//
+// "end condition"
+//    1st: read length >= expected read length
+//    2nd: alt condition "\r\n.\r\n" read?
+//
+// inject NotReady return:
+//   on before read
+//   on read after transmitting >= 1 byte
+//   on before write
+//   on write after trasmitting >= 1 byte
+//
+// on NotReady return:
+//   send Task to DelayedWakerThread
+
 impl AsyncRead for MockSocket {
 
+    /// `poll_read` impl
+    ///
+    /// # Implementation Details
+    ///
+    /// - Can always return with `NotReady` before doing anything.
+    /// - panics if the state is `ClientIsWorking` or `ShutdownOrPoison`
+    /// - on `NeedNewAction` it advances the state to the next extion and
+    ///   returns `NotReady` panicing if there is no new action
+    /// - writes a random amount of bytes to the passed in read buffer
+    ///   (at last 1), advancing the state to `NeedNewAction` once all bytes
+    ///   have been read
     fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, std_io::Error> {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
@@ -318,6 +384,16 @@ impl AsyncRead for MockSocket {
 
 impl AsyncWrite for MockSocket {
 
+    /// `poll_write` impl
+    ///
+    /// # Implementation Details
+    ///
+    /// - Can always return with `NotReady` before doing anything.
+    /// - panics if the state is `ServerIsWorking` or `ShutdownOrPoison`
+    /// - on `NeedNewAction` it advances the state to the next extion and
+    ///   returns `NotReady` panicing if there is no new action
+    /// - writes a random amount of passed in bytes (at last 1) to the
+    ///   input buffer then returns `Ready` with the written byte count
     fn poll_write(&mut self, buf: &[u8]) -> Poll<usize, std_io::Error> {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
@@ -347,6 +423,27 @@ impl AsyncWrite for MockSocket {
         }
     }
 
+
+    /// `poll_flush` impl
+    ///
+    /// # Implementation Details
+    ///
+    /// - Can always return with `NotReady` before doing anything.
+    /// - panics if the state is `ServerIsWorking` or `ShutdownOrPoison`
+    /// - on `NeedNewAction` it advances the state to the next extion and
+    ///   returns `NotReady`, _or_ if there is no further action returns
+    ///   `Ready`
+    /// - always returns `Ready` in the `ClientIsWorking` state if
+    ///   it doesn't panic through a (test) assert
+    /// - in `ClientIsWorking` it is asserted that the read buffer and
+    ///   expected buffer start the same way (up the the min of the len
+    ///   of both). If it is found that all bytes where parsed as expected
+    ///   the state is advanced to `NeedNewAction`. If more bytes where
+    ///   read then they stay in the buffer which will cause a panic
+    ///   when advencing to the next action  if the next action is
+    ///   not another `Client` action.
+    ///
+    ///
     fn poll_flush(&mut self) -> Poll<(), std_io::Error> {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
@@ -385,6 +482,18 @@ impl AsyncWrite for MockSocket {
         }
     }
 
+    /// `shudown` impl
+    ///
+    /// # Implementation Details
+    ///
+    /// - can return `NotReady` in any state
+    /// - uses `poll_flush` until everything is flushed
+    /// - If state is not `ShutdownOrPoison` or `NeedNewAction` it will panic.
+    /// - Be aware that due to the call to flush a state
+    ///   of `ClientIsWorking` is likely to change or panic
+    ///   in `poll_flush` instead of in `shutdown`
+    ///
+    ///
     fn shutdown(&mut self) -> Poll<(), std_io::Error> {
         // shutdown implies flush, so we flush
         try_ready!(self.poll_flush());
@@ -399,7 +508,10 @@ impl AsyncWrite for MockSocket {
 }
 
 
-
+/// returns a random number in `[1; max_inclusive]`, where` max_inclusive` is the most likely value
+///
+/// Note: `random_amount(0)` always returns 0, any other value returns a number
+/// between 1 and the value (inclusive).
 fn random_amount(max_inclusive: usize) -> usize {
     // max is inclusive but gen_range would make it exclusive
     let max_write = max_inclusive + 1;
@@ -408,10 +520,9 @@ fn random_amount(max_inclusive: usize) -> usize {
     min(max_inclusive, thread_rng().gen_range(1, max_write + 16))
 }
 
-fn write_n_to_slice(from: &BytesMut, to_buf: &mut [u8], n: usize) {
-    let copy_to = &mut to_buf[..n];
-    let copy_from = &from[..n];
-    copy_to.copy_from_slice(copy_from);
+/// copies `from[..n]` to `to[..n]`
+fn write_n_to_slice(from: &[u8], to: &mut [u8], n: usize) {
+    to[..n].copy_from_slice(&from[..n]);
 }
 
 //TODO potentially add some overlap detection
