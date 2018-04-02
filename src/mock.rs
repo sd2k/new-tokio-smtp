@@ -458,6 +458,34 @@ mod test {
         Box::new(rx.then(|_| future::ok(())))
     }
 
+    mod random_amount {
+        use super::super::random_amount;
+
+        #[test]
+        fn on_1() {
+            for _ in 0..100 {
+                assert_eq!(random_amount(1), 1);
+            }
+        }
+
+        #[test]
+        fn on_0() {
+            for _ in 0..100 {
+                assert_eq!(random_amount(0), 0);
+            }
+        }
+
+        #[test]
+        fn on_X() {
+            let x = 10;
+            for _ in 0..100 {
+                let got = random_amount(x);
+                assert!(got >= 1);
+                assert!(got <= x);
+            }
+        }
+    }
+
     mod delayed_waker {
         use futures::Future;
 
@@ -491,12 +519,94 @@ mod test {
         }
     }
 
+    mod ActionData {
+        use super::super::ActionData;
+
+        mod len {
+            use super::*;
+
+            #[test]
+            fn len_blob() {
+
+            }
+
+            #[test]
+            fn len_lines() {
+
+            }
+
+        }
+
+        mod assert_start_same {
+            use super::*;
+
+
+            #[test]
+            fn blob_smaller_other() {
+
+            }
+
+            #[test]
+            fn blob_larger_other() {
+
+            }
+
+            #[test]
+            fn lines_smaller_other() {
+
+            }
+
+            #[test]
+            fn lines_larger_other() {
+
+            }
+        }
+    }
+
     mod MockSocket {
 
         use bytes::Bytes;
 
         use super::super::*;
         use super::time_out;
+
+        mod shutdown {
+            use super::*;
+
+            #[should_panic]
+            #[test]
+            fn on_still_working_socket() {
+                let waker = delayed_waker();
+                let mut socket = MockSocket::new(vec![]);
+                socket.state = State::ServerIsWorking {
+                    waker, to_be_read: BytesMut::new()
+                };
+
+                let _res = future
+                    ::poll_fn(|| socket.shutdown())
+                    .select(time_out(1)
+                        .then(|_| -> Result<(), std_io::Error> { panic!("timeout") }))
+                    .wait();
+            }
+
+            #[test]
+            fn on_done_conversation() {
+                let mut socket = MockSocket::new(vec![]);
+
+                let res = future
+                    ::poll_fn(|| socket.shutdown())
+                    .select(time_out(1)
+                        .then(|_| -> Result<(), std_io::Error> { panic!("timeout") }))
+                    .wait();
+
+                match res {
+                    Ok(_) => (),
+                    Err((err, _)) => panic!("unexpected error {:?}", err)
+                }
+            }
+
+        }
+
 
 
         #[test]
