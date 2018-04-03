@@ -275,6 +275,19 @@ impl Drop for MockSocket {
     }
 }
 
+impl From<MockSocket> for ::io::Socket {
+    fn from(s: MockSocket) -> Self {
+        ::io::Socket::Mock(Box::new(s))
+    }
+}
+
+impl From<MockSocket> for ::io::Io {
+    fn from(s: MockSocket) -> Self {
+        let socket: ::io::Socket = s.into();
+        ::io::Io::from((socket, ::io::Buffers::new()))
+    }
+}
+
 impl MockStream for MockSocket {
     fn is_secure(&self) -> bool {
         self.fake_secure
