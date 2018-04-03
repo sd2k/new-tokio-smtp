@@ -17,6 +17,10 @@ pub struct Ehlo {
 
 impl Ehlo {
 
+    pub fn new(identity: ClientIdentity) -> Self {
+        Ehlo { identity }
+    }
+
     pub fn identity(&self) -> &ClientIdentity {
         &self.identity
     }
