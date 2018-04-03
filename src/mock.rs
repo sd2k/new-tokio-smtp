@@ -69,20 +69,32 @@ impl ActionData {
                     assert!(use_of_line.as_bytes() == other, "unexpected data");
 
                     if use_len < line.len() {
-                        // we could just check a part of a line,
-                        // so we need more data => brake
+                        // we need more data => brake
                         break;
                     }
 
-                    let other = &other[use_len..];
-
                     //check the "\r\n" omitted in Lines
-                    assert!(other.starts_with(b"\r\n"), "unexpected data");
-                    rem = &other[2..];
+                    rem = check_crlf_start(&rem[use_len..]);
                 }
             }
         }
     }
+}
+
+fn check_crlf_start(tail: &[u8]) -> &[u8] {
+    let mut tail = tail;
+    let length = tail.len();
+    if length >= 1 {
+        assert!(tail[0] == b'\r', "unexpected data");
+        tail = &tail[1..];
+    }
+    if length >= 2 {
+        assert!(tail[0] == b'\n', "unexpected data");
+        tail = &tail[1..];
+    }
+
+    tail
+
 }
 
 type Waker = mpsc::UnboundedSender<Task>;
@@ -633,19 +645,41 @@ mod test {
     }
 
     mod ActionData {
+        use std::panic;
         use super::super::ActionData;
+
+        fn should_fail<FN>(func: FN)
+            where FN: panic::UnwindSafe + FnOnce()
+        {
+            match panic::catch_unwind(func) {
+                Ok(_) => panic!("closure should have paniced"),
+                Err(_) => ()
+            }
+        }
+
+        #[should_panic]
+        #[test]
+        fn should_fail_should_panic_on_ok() {
+            should_fail(|| ())
+        }
 
         mod len {
             use super::*;
 
             #[test]
             fn len_blob() {
-
+                let blob = ActionData::Blob("la blob".to_owned().into());
+                assert_eq!(blob.len(), 7)
             }
 
             #[test]
             fn len_lines() {
+                let lines = ActionData::Lines(vec![
+                    "123",
+                    "678"
+                ]);
 
+                assert_eq!(lines.len(), 10)
             }
 
         }
@@ -656,22 +690,39 @@ mod test {
 
             #[test]
             fn blob_smaller_other() {
-
+                let blob = ActionData::Blob("blob".to_owned().into());
+                blob.assert_same_start(b"blo" as &[u8]);
+                should_fail(|| blob.assert_same_start(b"blO" as &[u8]));
             }
 
             #[test]
             fn blob_larger_other() {
-
+                let blob = ActionData::Blob("blob".to_owned().into());
+                blob.assert_same_start(b"blob and top" as &[u8]);
+                should_fail(|| blob.assert_same_start(b"bloB and top" as &[u8]));
             }
 
             #[test]
             fn lines_smaller_other() {
+                let lines = ActionData::Lines(vec!["123", "678"]);
+                lines.assert_same_start(b"123\r\n6" as &[u8]);
+                should_fail(|| lines.assert_same_start(b"123\r\n7" as &[u8]));
+                should_fail(|| lines.assert_same_start(b"123\n\n6" as &[u8]));
+            }
+
+            #[test]
+            fn lines_same_len_other() {
+                let lines = ActionData::Lines(vec!["123", "678"]);
+                lines.assert_same_start(b"123\r\n678\r\n" as &[u8]);
+                should_fail(|| lines.assert_same_start(b"123\r\n678\r\r" as &[u8]));
 
             }
 
             #[test]
             fn lines_larger_other() {
-
+                let lines = ActionData::Lines(vec!["123", "678"]);
+                lines.assert_same_start(b"123\r\n678\r\nho" as &[u8]);
+                should_fail(|| lines.assert_same_start(b"123\r\n678\rho" as &[u8]));
             }
         }
     }
