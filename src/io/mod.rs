@@ -22,6 +22,8 @@ pub use self::dot_stashing::*;
 mod connect;
 pub use self::connect::*;
 
+pub const CR_LF: &str = "\r\n";
+
 // most responses should fit in 256 bytes
 const INPUT_BUFFER_INC_SIZE: usize = 256;
 // most commands should fit in 1024 bytes (except e.g. DATA/BDAT)

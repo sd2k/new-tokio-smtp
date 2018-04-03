@@ -4,8 +4,7 @@ use bytes::{BytesMut, BufMut};
 use data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
 
 use ::{Connection, CmdFuture, Cmd, SimpleCmd};
-
-const CR_LF: &str = "\r\n";
+use ::io::CR_LF;
 
 #[macro_export]
 macro_rules! impl_simple_command {
