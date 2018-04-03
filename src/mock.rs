@@ -215,7 +215,6 @@ impl MockSocket {
     ///   buffer is not empty
     ///
     fn prepare_next(&mut self, waker: Waker, buffer: BytesMut) -> State {
-
         let (actor, data) = self.conversation.pop()
             .expect("prepare next on empty conversation");
 
@@ -334,12 +333,20 @@ impl Write for MockSocket {
 
 // before read/write:
 //   read/write --> state == NeedNewAction --> prepare next action
+//                                               \-> on no next action
+//                                                      |-> on read -> NotReady*
+//                                                      \-> on write -> panic
+//
+// [*]: the client might call read until it read all "ready" data, even if the
+//      read data already did contain all data it needs, so we can not panic here
+//      through it might lifelock the client in other siturations, so we need to
+//      build in a timeout into all tests
 //
 // on read:
 //   read --> Actor == Server -> part of  buffer into read -> return bytes transmitted
 //        |                                 \-> state = NeedNewAction
 //        |
-//        \-> Actor == Client -> would Block / panic?
+//        \-> Actor == Client ->  panic
 //
 // on write:
 //   write --> Actor == Client -> read from buffer -> return ...
@@ -347,7 +354,7 @@ impl Write for MockSocket {
 //         |                                \-> assert read input == expected input
 //         |                                       \-> state = NeedNewAction
 //         |
-//         \-> Actor == Server -> would Block / panic?
+//         \-> Actor == Server -> panic
 //
 // "end condition"
 //    1st: read length >= expected read length
@@ -370,8 +377,8 @@ impl AsyncRead for MockSocket {
     ///
     /// - Can always return with `NotReady` before doing anything.
     /// - panics if the state is `ClientIsWorking` or `ShutdownOrPoison`
-    /// - on `NeedNewAction` it advances the state to the next extion and
-    ///   returns `NotReady` panicing if there is no new action
+    /// - on `NeedNewAction` it advances the state to the next action if
+    ///   there is any and returns `NotReady`
     /// - writes a random amount of bytes to the passed in read buffer
     ///   (at last 1), advancing the state to `NeedNewAction` once all bytes
     ///   have been read
@@ -386,7 +393,11 @@ impl AsyncRead for MockSocket {
                 panic!("tried to read from socket while it should only write to it")
             },
             State::NeedNewAction { waker, buffer } => {
-                self.state = self.prepare_next(waker, buffer);
+                if self.conversation.is_empty() {
+                    self.state = State::NeedNewAction { waker, buffer };
+                } else {
+                    self.state = self.prepare_next(waker, buffer);
+                }
                 self.schedule_delayed_wake();
                 Ok(Async::NotReady)
             }
