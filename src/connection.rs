@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 
 use bytes::{BytesMut, BufMut};
 use futures::future::{self, Future};
+use tokio::io::{shutdown, Shutdown};
 
 use ::future_ext::ResultWithContextExt;
 use ::data_types::EhloData;
@@ -13,7 +14,7 @@ use ::common::{
     TlsConfig,
     SetupTls
 };
-use ::io::{Io, SmtpResult};
+use ::io::{Io, SmtpResult, Socket};
 
 
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
@@ -177,6 +178,12 @@ impl Connection {
     pub fn destruct(self) -> (Io, Option<EhloData>) {
         let Connection { io, ehlo } = self;
         (io, ehlo)
+    }
+
+    pub fn shutdown(self) -> Shutdown<Socket> {
+        let (io, _) = self.destruct();
+        let (socket, _) = io.destruct();
+        shutdown(socket)
     }
 }
 
