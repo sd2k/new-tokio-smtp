@@ -22,7 +22,7 @@ impl<S: 'static> Cmd for Data<S>
         let Data { source } = self;
 
         let fut = io
-            .flush_cmd("DATA")
+            .flush_line("DATA")
             .and_then(Io::parse_response)
             .and_then(move |(io, result)| match result {
                 Err(response) => {

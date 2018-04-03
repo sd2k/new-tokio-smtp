@@ -4,7 +4,7 @@ use bytes::BufMut;
 use futures::{Poll, Future, Async};
 use tokio::io::AsyncWrite;
 
-use super::Io;
+use super::{Io, CR_LF};
 
 
 impl Io {
@@ -13,11 +13,11 @@ impl Io {
     }
 
     /// writes `cmd` and then `"\r\n"` to `buffer.input` and then calls `flush`
-    pub fn flush_cmd(mut self, cmd: &str) -> Flushing {
+    pub fn flush_line(mut self, line: &str) -> Flushing {
         {
-            let out = self.out_buffer(cmd.len() + 2);
-            out.put(cmd);
-            out.put("\r\n");
+            let out = self.out_buffer(line.len() + CR_LF.len());
+            out.put(line);
+            out.put(CR_LF);
         }
         self.flush()
     }
