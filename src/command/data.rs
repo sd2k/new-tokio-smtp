@@ -3,6 +3,7 @@ use std::{io as std_io};
 use bytes::Buf;
 use futures::future::{self, Either, Future};
 use futures::stream::Stream;
+use future_ext::ResultWithContextExt;
 
 use ::{Connection, CmdFuture, Cmd, Io};
 use ::response::codes;
@@ -24,31 +25,19 @@ impl<S: 'static> Cmd for Data<S>
         let fut = io
             .flush_line("DATA")
             .and_then(Io::parse_response)
-            .and_then(move |(io, result)| match result {
-                Err(response) => {
-                    let con = Connection::from((io, ehlo));
-                    Either::A(future::ok((con, Err(response))))
-                },
-                Ok(response) => {
-                    if response.code() != codes::START_MAIL_DATA {
-                        //TODO differ in error between Fault/IoError/TlsError(potential fault?)
-                        return Either::A(future::err(std_io::Error::new(
-                            std_io::ErrorKind::Other,
-                            "unexpected server response"
-                        )));
-                    }
-
-                    let fut = io
-                        .write_dot_stashed(source)
-                        .and_then(Io::parse_response)
-                        .map(|(io, result)| {
-                            let con = Connection::from((io, ehlo));
-                            (con, result)
-                        });
-
-                    Either::B(fut)
+            .ctx_and_then(move |io, response| {
+                if response.code() != codes::START_MAIL_DATA {
+                    //TODO differ in error between Fault/IoError/TlsError(potential fault?)
+                    return Either::A(future::ok((io, Err(response))));
                 }
-            });
+
+                let fut = io
+                    .write_dot_stashed(source)
+                    .and_then(Io::parse_response);
+
+                Either::B(fut)
+            })
+            .map(move |(io, result)| (Connection::from((io, ehlo)), result));
 
         Box::new(fut)
     }
