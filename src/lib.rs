@@ -4,6 +4,7 @@ extern crate bytes;
 extern crate tokio;
 extern crate tokio_tls;
 extern crate native_tls;
+extern crate base64;
 #[cfg(feature="mock_impl")]
 extern crate rand;
 
