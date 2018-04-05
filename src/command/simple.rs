@@ -42,6 +42,13 @@ pub struct Mail {
     pub params: Params
 }
 
+impl Mail {
+
+    pub fn new(reverse_path: ReversePath) -> Self {
+        Mail { reverse_path, params: Params::new() }
+    }
+}
+
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Recipient {
@@ -49,6 +56,13 @@ pub struct Recipient {
     //Note: that Postmaster is case-sensitive
     pub forward_path: ForwardPath,
     pub params: Params
+}
+
+impl Recipient {
+
+    pub fn new(forward_path: ForwardPath) -> Self {
+        Recipient { forward_path, params: Params::new() }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
