@@ -28,6 +28,7 @@ macro_rules! impl_simple_command {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Reset;
 
+//TODO Quit should also do a con.shutdown
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Quit;
 
