@@ -4,11 +4,12 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 use std::fmt::{self, Display};
 use std::error::Error;
-use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 
 use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
+//TODO potentially move this to common
 pub struct EhloData {
     domain: Domain,
     data: HashMap<Capability, Vec<EhloParam>>
@@ -356,9 +357,9 @@ impl AddressLiteral {
 }
 
 
-impl From<SocketAddr> for AddressLiteral {
-    fn from(addr: SocketAddr) -> Self {
-        use self::SocketAddr::*;
+impl From<IpAddr> for AddressLiteral {
+    fn from(addr: IpAddr) -> Self {
+        use self::IpAddr::*;
         match addr {
             V4(ref addr) => AddressLiteral::from(addr),
             V6(ref addr) => AddressLiteral::from(addr)
@@ -366,26 +367,26 @@ impl From<SocketAddr> for AddressLiteral {
     }
 }
 
-impl From<SocketAddrV4> for AddressLiteral {
-    fn from(addr: SocketAddrV4) -> Self {
+impl From<Ipv4Addr> for AddressLiteral {
+    fn from(addr: Ipv4Addr) -> Self {
         AddressLiteral::from(&addr)
     }
 }
 
-impl From<SocketAddrV6> for AddressLiteral {
-    fn from(addr: SocketAddrV6) -> Self {
+impl From<Ipv6Addr> for AddressLiteral {
+    fn from(addr: Ipv6Addr) -> Self {
         AddressLiteral::from(&addr)
     }
 }
 
-impl<'a> From<&'a SocketAddrV4> for AddressLiteral {
-    fn from(addr: &'a SocketAddrV4) -> Self {
+impl<'a> From<&'a Ipv4Addr> for AddressLiteral {
+    fn from(addr: &'a Ipv4Addr) -> Self {
         AddressLiteral(format!("[{}]", addr).into())
     }
 }
 
-impl<'a> From<&'a SocketAddrV6> for AddressLiteral {
-    fn from(addr: &'a SocketAddrV6) -> Self {
+impl<'a> From<&'a Ipv6Addr> for AddressLiteral {
+    fn from(addr: &'a Ipv6Addr) -> Self {
         AddressLiteral(format!("[IPv6:{}]", addr).into())
     }
 }

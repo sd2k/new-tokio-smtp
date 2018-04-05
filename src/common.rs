@@ -1,5 +1,5 @@
 use std::io as std_io;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, IpAddr};
 use std::fmt::Debug;
 use native_tls::{self, TlsConnectorBuilder, TlsConnector};
 
@@ -23,8 +23,8 @@ impl From<AddressLiteral> for ClientIdentity {
     }
 }
 
-impl From<SocketAddr> for ClientIdentity {
-    fn from(saddr: SocketAddr) -> Self {
+impl From<IpAddr> for ClientIdentity {
+    fn from(saddr: IpAddr) -> Self {
         let adl = AddressLiteral::from(saddr);
         ClientIdentity::from(adl)
     }
