@@ -24,14 +24,6 @@ impl Response {
     pub fn msg(&self) -> &[String] {
         &self.lines
     }
-
-    pub fn into_result(self) -> Result<Response, Response> {
-        if self.is_erroneous() {
-            Err(self)
-        } else {
-            Ok(self)
-        }
-    }
 }
 
 

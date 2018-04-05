@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::AsRef;
 use std::borrow::Borrow;
 use std::str::FromStr;

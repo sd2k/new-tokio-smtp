@@ -5,6 +5,7 @@ use tokio_tls::TlsStream;
 use tokio::net::TcpStream;
 
 use ::response::Response;
+use ::error::LogicError;
 
 
 mod socket;
@@ -29,7 +30,7 @@ const INPUT_BUFFER_INC_SIZE: usize = 256;
 // most commands should fit in 1024 bytes (except e.g. DATA/BDAT)
 const OUTPUT_BUFFER_INC_SIZE: usize = 1024;
 
-pub type SmtpResult = Result<Response, Response>;
+pub type SmtpResult = Result<Response, LogicError>;
 
 
 #[derive(Debug)]

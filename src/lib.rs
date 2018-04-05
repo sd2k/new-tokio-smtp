@@ -17,6 +17,7 @@ mod data_types;
 #[macro_use]
 mod common;
 pub mod response;
+pub mod error;
 pub mod io;
 mod connection;
 pub mod command;

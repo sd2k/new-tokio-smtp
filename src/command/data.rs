@@ -7,6 +7,7 @@ use future_ext::ResultWithContextExt;
 
 use ::{Connection, CmdFuture, Cmd, Io};
 use ::response::codes;
+use ::error::LogicError;
 
 
 pub struct Data<S> {
@@ -44,7 +45,7 @@ impl<S: 'static> Cmd for Data<S>
             .ctx_and_then(move |io, response| {
                 if response.code() != codes::START_MAIL_DATA {
                     //TODO differ in error between Fault/IoError/TlsError(potential fault?)
-                    return Either::A(future::ok((io, Err(response))));
+                    return Either::A(future::ok((io, Err(LogicError::UnexpectedCode(response)))));
                 }
 
                 let fut = io

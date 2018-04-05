@@ -1,11 +1,11 @@
 use bytes::BufMut;
 use futures::future::{self, Either, Future};
 use future_ext::ResultWithContextExt;
+use base64::encode;
 
 use ::{Connection, CmdFuture, Cmd, Io};
 use ::io::CR_LF;
-use base64::encode;
-
+use ::error::LogicError;
 
 
 #[derive(Debug, Clone)]
@@ -59,8 +59,7 @@ impl Cmd for AuthLogin {
             .and_then(Io::parse_response)
             .ctx_and_then(move |io: Io, response| {
                 if !response.code().is_intermediate() {
-                    //TODO better error handling
-                    Either::A(future::ok((io, Err(response))))
+                    Either::A(future::ok((io, Err(LogicError::UnexpectedCode(response)))))
                 } else {
                     let fut = io
                         .flush_line(password.as_str())

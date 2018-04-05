@@ -6,7 +6,7 @@ use native_tls::{self, TlsConnectorBuilder, TlsConnector};
 
 use ::ascii::IgnoreAsciiCaseStr;
 
-use ::data_types::{Domain, AddressLiteral, EhloParam, Capability, EsmtpKeyword};
+use ::data_types::{Domain, AddressLiteral, EhloParam, Capability};
 
 #[derive(Debug, Clone)]
 pub enum ClientIdentity {

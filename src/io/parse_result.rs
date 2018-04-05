@@ -6,6 +6,7 @@ use futures::{Poll, Future, Async};
 use tokio::io::AsyncRead;
 
 use ::response::parser;
+use ::error::check_response;
 
 use super::{Io, SmtpResult, INPUT_BUFFER_INC_SIZE};
 
@@ -152,7 +153,7 @@ impl Parsing {
 
                 let io = self.inner.take().expect("[BUG] poll after completion");
                 //FIXME[buf_management]: maybe normalize output bufer to have at most cap of 1024
-                return Ok(Some((io, response.into_result())));
+                return Ok(Some((io, check_response(response))));
 
             } else {
                 return Ok(None);

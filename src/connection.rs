@@ -221,7 +221,20 @@ impl From<(Io, Option<EhloData>)> for Connection {
 }
 
 
-
+//TODO add a way for "checking" capabilities
+//Methods:
+//  1. Cmd::check(&EhloData) -> bool
+//  2. Cmd::Capabilities => &'static [ &'static str ]
+//      - but what is with dynamic requirements e.g. a improved Mail cmd could,
+//        require SMTPUTF8 for mailboxes which, well, require it
+//
+// Performance Considerations:
+//  most capabilities boil down to a few:
+//    - MIME8BIT, SMTPUTF8, AUTH, PIPELINING, STARTTLS, SIZE (+a few others)
+//  so it might make sense to have a BIT field for them
+//  also for SIZE, parsing the size and having a .size() -> usize method would make sense
+//  and for auth a .auth(kind: &str) -> bool
+//
 pub trait Cmd {
     fn exec(self, con: Connection) -> CmdFuture;
     fn boxed(self) -> BoxedCmd
