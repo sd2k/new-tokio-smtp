@@ -67,7 +67,7 @@ impl Connection {
     }
 
     pub fn connect_insecure(addr: &SocketAddr, clid: ClientIdentity) -> CmdFuture {
-        //Note: this has a cicular dependency between Connection <-> cmd Ehlo which
+        //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
         let fut = Connection
@@ -87,7 +87,7 @@ impl Connection {
     ) -> CmdFuture
         where S: SetupTls
     {
-        //Note: this has a cicular dependency between Connection <-> cmd Ehlo which
+        //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
         let fut = Connection
@@ -107,7 +107,7 @@ impl Connection {
         -> CmdFuture
         where S: SetupTls
     {
-        //Note: this has a cicular dependency between Connection <-> cmd StartTls/Ehlo which
+        //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::{StartTls, Ehlo};
         let TlsConfig { domain, setup } = config;
@@ -184,6 +184,21 @@ impl Connection {
         let (io, _) = self.split();
         let (socket, _) = io.split();
         shutdown(socket)
+    }
+
+    //TODO[rust/impl Trait]: remove boxing
+    /// sends Quit to the server and then shuts down the socket
+    pub fn end(self)
+        -> future::AndThen<
+            CmdFuture,
+            Shutdown<Socket>,
+            fn((Connection, SmtpResult)) -> Shutdown<Socket>>
+    {
+        //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
+        // could be resolved using a ext. trait, but it's more ergonomic this way
+        use command::Quit;
+
+        self.send(Quit).and_then(|(con, _res)| con.shutdown())
     }
 }
 
