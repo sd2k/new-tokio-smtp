@@ -44,7 +44,7 @@ impl Cmd for AuthLogin {
         //3. send| <base64password>
         //4. recv| 235 2.7.0 Accepted
 
-        let (mut io, ehlo) = con.destruct();
+        let (mut io, ehlo) = con.split();
         let AuthLogin { username, password } = self;
 
         let len_needed = CMD_BASE.len() + username.len() + CR_LF.len();

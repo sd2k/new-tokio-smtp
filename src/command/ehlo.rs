@@ -41,7 +41,7 @@ impl Into<ClientIdentity> for Ehlo {
 impl Cmd for Ehlo {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (mut io, _ehlo) = con.destruct();
+        let (mut io, _ehlo) = con.split();
 
         let str_me = match *self.identity() {
             ClientIdentity::Domain(ref domain) => domain.as_str(),

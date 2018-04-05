@@ -140,7 +140,7 @@ impl Connection {
     }
 
     pub fn send_simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
-        let (mut io, ehlo) = self.destruct();
+        let (mut io, ehlo) = self.split();
         {
             let buffer = io.out_buffer(1024);
             cmd.write_cmd(buffer);
@@ -175,14 +175,14 @@ impl Connection {
         self.ehlo.as_ref()
     }
 
-    pub fn destruct(self) -> (Io, Option<EhloData>) {
+    pub fn split(self) -> (Io, Option<EhloData>) {
         let Connection { io, ehlo } = self;
         (io, ehlo)
     }
 
     pub fn shutdown(self) -> Shutdown<Socket> {
-        let (io, _) = self.destruct();
-        let (socket, _) = io.destruct();
+        let (io, _) = self.split();
+        let (socket, _) = io.split();
         shutdown(socket)
     }
 }

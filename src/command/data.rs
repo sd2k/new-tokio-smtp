@@ -35,7 +35,7 @@ impl<S: 'static> Cmd for Data<S>
 {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (io, ehlo) = con.destruct();
+        let (io, ehlo) = con.split();
         let Data { source } = self;
 
         let fut = io

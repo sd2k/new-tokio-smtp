@@ -46,7 +46,7 @@ impl Io {
        \\---------------------------------------------------------------//
     */
 
-    pub fn destruct(self) -> (Socket, Buffers) {
+    pub fn split(self) -> (Socket, Buffers) {
         let Io { socket, buffer } = self;
         (socket, buffer)
     }

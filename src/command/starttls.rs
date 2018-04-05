@@ -69,7 +69,7 @@ impl<S> Cmd for StartTls<S>
 {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (mut io, ehlo_data) = con.destruct();
+        let (mut io, ehlo_data) = con.split();
         let StartTls { sni_domain, setup_tls } = self;
 
         let was_mock =
@@ -114,7 +114,7 @@ impl<S> Cmd for StartTls<S>
                         |err| Either::A(future::err(map_tls_err(err)))
                     );
 
-                    let (socket, _buffer) = io.destruct();
+                    let (socket, _buffer) = io.split();
                     let stream = match socket {
                         Socket::Insecure(stream) => stream,
                         _ => unreachable!()
