@@ -66,14 +66,17 @@ fn test_ehlo_cmd() {
 #[test]
 fn test_data_cmd() {
     //setup connection
+    unimplemented!()
 }
 
 #[test]
 fn test_mail_cmd() {
     //setup connection
+    unimplemented!()
 }
 
 #[test]
 fn test_recipient_cmd() {
     //setup connection
+    unimplemented!()
 }
