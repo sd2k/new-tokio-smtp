@@ -6,8 +6,8 @@ use futures::future::{self, Future};
 use tokio::io::{shutdown, Shutdown};
 
 use ::future_ext::ResultWithContextExt;
-use ::data_types::EhloData;
 use ::common::{
+    EhloData,
     ConnectionConfig,
     ClientIdentity,
     Security,

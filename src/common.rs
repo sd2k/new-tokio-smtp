@@ -1,9 +1,12 @@
 use std::io as std_io;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt::Debug;
+use std::collections::HashMap;
 use native_tls::{self, TlsConnectorBuilder, TlsConnector};
 
-use ::data_types::{Domain, AddressLiteral};
+use ::ascii::IgnoreAsciiCaseStr;
+
+use ::data_types::{Domain, AddressLiteral, EhloParam, Capability, EsmtpKeyword};
 
 #[derive(Debug, Clone)]
 pub enum ClientIdentity {
@@ -135,4 +138,47 @@ pub(crate) fn map_tls_err(err: native_tls::Error) -> std_io::Error {
         std_io::ErrorKind::Other,
         err
     )
+}
+
+
+pub struct EhloData {
+    domain: Domain,
+    data: HashMap<Capability, Vec<EhloParam>>
+}
+
+impl EhloData {
+
+    pub fn new(domain: Domain, data: HashMap<Capability, Vec<EhloParam>>) -> Self {
+        EhloData { domain, data }
+    }
+
+    pub fn has_capability<A>(&self, cap: A) -> bool
+        where A: AsRef<str>
+    {
+        self.data.contains_key(<&IgnoreAsciiCaseStr>::from(cap.as_ref()))
+    }
+
+    pub fn get_capability_params<A>(&self, cap: A) -> Option<&[EhloParam]>
+        where A: AsRef<str>
+    {
+        self.data.get(<&IgnoreAsciiCaseStr>::from(cap.as_ref()))
+            .map(|vec| &**vec)
+    }
+
+    pub fn capability_map(&self) -> &HashMap<Capability, Vec<EhloParam>> {
+        &self.data
+    }
+
+    pub fn domain(&self) -> &Domain {
+        &self.domain
+    }
+
+}
+
+
+impl Into<(Domain, HashMap<Capability, Vec<EhloParam>>)> for EhloData {
+    fn into(self) -> (Domain, HashMap<Capability, Vec<EhloParam>>) {
+        let EhloData { domain, data } = self;
+        (domain, data)
+    }
 }
