@@ -1,6 +1,6 @@
 use std::{io as std_io};
 
-use bytes::Buf;
+use bytes::{Buf, IntoBuf};
 use futures::future::{self, Either, Future};
 use futures::stream::{self, Stream};
 use future_ext::ResultWithContextExt;
@@ -14,15 +14,19 @@ pub struct Data<S> {
     source: S
 }
 
+impl<BF> Data<stream::Once<BF, std_io::Error>>
+    where BF: Buf
+{
+    pub fn from_buf<B: IntoBuf<Buf=BF>>(buf: B) -> Self {
+        Data::new(stream::once(Ok(buf.into_buf())))
+    }
+}
+
 impl<S> Data<S>
     where S: Stream<Error=std_io::Error>, S::Item: Buf
 {
     pub fn new(source: S) -> Self {
         Data { source }
-    }
-
-    pub fn from_buf<B: Buf>(buf: B) -> Data<stream::Once<B, std_io::Error>> {
-        Data::new(stream::once(Ok(buf)))
     }
 }
 
