@@ -11,6 +11,25 @@ pub enum ClientIdentity {
     AddressLiteral(AddressLiteral)
 }
 
+impl From<Domain> for ClientIdentity {
+    fn from(dm: Domain) -> Self {
+        ClientIdentity::Domain(dm)
+    }
+}
+
+impl From<AddressLiteral> for ClientIdentity {
+    fn from(adl: AddressLiteral) -> Self {
+        ClientIdentity::AddressLiteral(adl)
+    }
+}
+
+impl From<SocketAddr> for ClientIdentity {
+    fn from(saddr: SocketAddr) -> Self {
+        let adl = AddressLiteral::from(saddr);
+        ClientIdentity::from(adl)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TlsConfig<S = DefaultTlsSetup>
     where S: SetupTls
