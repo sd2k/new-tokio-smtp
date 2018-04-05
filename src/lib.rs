@@ -11,7 +11,7 @@ extern crate rand;
 // order of modules is also "order" in dependency-tree
 // i.e. module should only import from modules hither
 // up in the list
-mod future_ext;
+pub mod future_ext;
 mod ascii;
 mod data_types;
 #[macro_use]
