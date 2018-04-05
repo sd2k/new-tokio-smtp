@@ -2,7 +2,7 @@ use std::{io as std_io};
 
 use bytes::Buf;
 use futures::future::{self, Either, Future};
-use futures::stream::Stream;
+use futures::stream::{self, Stream};
 use future_ext::ResultWithContextExt;
 
 use ::{Connection, CmdFuture, Cmd, Io};
@@ -12,6 +12,18 @@ use ::response::codes;
 pub struct Data<S> {
     //TODO add parameter support
     source: S
+}
+
+impl<S> Data<S>
+    where S: Stream<Error=std_io::Error>, S::Item: Buf
+{
+    pub fn new(source: S) -> Self {
+        Data { source }
+    }
+
+    pub fn from_buf<B: Buf>(buf: B) -> Data<stream::Once<B, std_io::Error>> {
+        Data::new(stream::once(Ok(buf)))
+    }
 }
 
 impl<S: 'static> Cmd for Data<S>
