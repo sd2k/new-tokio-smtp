@@ -133,7 +133,8 @@ impl State {
 pub struct MockSocket {
     conversation: Vec<(Actor, ActionData)>,
     fake_secure: bool,
-    state: State
+    state: State,
+    check_shutdown: bool
 }
 
 /// MockSocket going through a pre-coded interlocked clinet-server conversation
@@ -152,18 +153,27 @@ pub struct MockSocket {
 ///
 impl MockSocket {
 
+    pub fn new(conversation: Vec<(Actor, ActionData)>) -> Self {
+        Self::new_with_params(conversation, true)
+    }
+
+    pub fn new_no_check_shutdown(conversation: Vec<(Actor, ActionData)>) -> Self {
+        Self::new_with_params(conversation, false)
+    }
+
     /// create a new `MockSocket` from a sequence of "actions"
     ///
     /// Actions are taken interlocked between `Client` (client write something, server reads)
     /// and `Server` (server writes something, client reads), which is one of the main
     /// limitations of the Mock implementation.
-    pub fn new(conversation: Vec<(Actor, ActionData)>) -> Self {
+    pub fn new_with_params(conversation: Vec<(Actor, ActionData)>, check_shutdown: bool) -> Self {
         let mut conversation = conversation;
         //queue => stack
         conversation.reverse();
 
         MockSocket {
             conversation,
+            check_shutdown,
             fake_secure: false,
             state: State::NeedNewAction {
                 buffer: BytesMut::new(),
@@ -266,8 +276,10 @@ impl Drop for MockSocket {
     /// - if the conversation did not end, i.e. was not empty
     fn drop(&mut self) {
         if !thread::panicking() {
-            if let State::ShutdownOrPoison = self.state {}
-            else { panic!("connection was not shutdown"); }
+            if self.check_shutdown {
+                if let State::ShutdownOrPoison = self.state {}
+                else { panic!("connection was not shutdown"); }
+            }
 
             assert!(self.conversation.is_empty(), "premeature cancelation of conversation");
         }
