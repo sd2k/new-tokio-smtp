@@ -21,6 +21,7 @@ pub mod error;
 pub mod io;
 mod connection;
 pub mod command;
+pub mod chain;
 #[cfg(feature="mock_impl")]
 pub mod mock;
 

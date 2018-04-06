@@ -3,28 +3,18 @@
 
 use new_tokio_smtp::{
     command,
-    Connection,
-    Io,
     ClientIdentity,
 };
 
 use new_tokio_smtp::mock::{
-    ActionData, Actor, MockSocket
+    ActionData, Actor
 };
 
 use self::Actor::*;
 use self::ActionData::*;
 
+use super::{mock, mock_no_shutdown};
 
-fn mock(conv: Vec<(Actor, ActionData)>) -> Connection {
-    let io: Io = MockSocket::new(conv).into();
-    Connection::from(io)
-}
-
-fn mock_no_shutdown(conv: Vec<(Actor, ActionData)>) -> Connection {
-    let io: Io = MockSocket::new_no_check_shutdown(conv).into();
-    Connection::from(io)
-}
 
 //fn server_id() -> ClientIdentity {
 //    ClientIdentity::Domain("they.test".parse().unwrap())

@@ -1,11 +1,9 @@
 use std::io as std_io;
 
 use futures::Future;
-use future_ext::ResultWithContextExt;
 
 use ::error::LogicError;
 use ::{Cmd, CmdFuture, Connection, Io};
-use ::response::codes;
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
