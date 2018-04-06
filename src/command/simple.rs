@@ -26,9 +26,6 @@ macro_rules! impl_simple_command {
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Reset;
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Quit;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -76,7 +73,6 @@ pub struct Help {
 }
 
 impl_simple_command! {
-    for Reset => |&self, buf| { buf.put("RSET") };
 
     for Quit => |&self, buf| { buf.put("QUIT") };
 
