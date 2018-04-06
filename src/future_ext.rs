@@ -7,7 +7,7 @@ pub trait ResultWithContextExt<Ctx, I, E>: Future<Item=(Ctx, Result<I, E>)> {
               Self: Sized;
 
     fn ctx_or_else<FN, B, E2>(self, f: FN) -> CtxOrElse<Self, B, FN>
-        where FN: FnOnce(Ctx, I) -> B,
+        where FN: FnOnce(Ctx, E) -> B,
               B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=Self::Error>,
               Self: Sized;
 }
@@ -27,7 +27,7 @@ impl<Ctx, I, E, FUT> ResultWithContextExt<Ctx, I, E> for FUT
     }
 
     fn ctx_or_else<FN, B, E2>(self, f: FN) -> CtxOrElse<Self, B, FN>
-        where FN: FnOnce(Ctx, I) -> B,
+        where FN: FnOnce(Ctx, E) -> B,
               B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=Self::Error>,
               Self: Sized
     {
