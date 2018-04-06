@@ -26,6 +26,11 @@ fn mock(conv: Vec<(Actor, ActionData)>) -> Connection {
     Connection::from(io)
 }
 
+fn mock_no_shutdown(conv: Vec<(Actor, ActionData)>) -> Connection {
+    let io: Io = MockSocket::new_no_check_shutdown(conv).into();
+    Connection::from(io)
+}
+
 fn server_id() -> ClientIdentity {
     ClientIdentity::Domain("they.test".parse().unwrap())
 }
@@ -61,6 +66,25 @@ fn test_ehlo_cmd() {
     }
 
     con.shutdown().wait().unwrap();
+}
+
+#[test]
+fn test_reset_cmd() {
+    let con = mock_no_shutdown(vec![
+        (Client,  Lines(vec!["RSET"])),
+        (Server,  Lines(vec!["420 server messed up"])),
+    ]);
+
+    let fut = con
+        .send(command::Reset)
+        .map(|(con, result)| match result {
+            Ok(r) => panic!("unexpected reset did not fail: {:?}", r),
+            Err(e) => panic!("unexpected reset errord: {:?}", e)
+        });
+
+    let res = fut.wait();
+
+    assert!(res.is_err());
 }
 
 #[test]
