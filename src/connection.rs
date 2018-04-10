@@ -188,7 +188,7 @@ impl Connection {
 
     //TODO[rust/impl Trait]: remove boxing
     /// sends Quit to the server and then shuts down the socket
-    pub fn end(self)
+    pub fn quit(self)
         -> future::AndThen<
             CmdFuture,
             Shutdown<Socket>,
