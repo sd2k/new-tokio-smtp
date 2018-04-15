@@ -5,9 +5,12 @@ use futures::future::{self, Either, Future};
 use native_tls::TlsConnector;
 use tokio_tls::TlsConnectorExt;
 
-use ::data_types::Domain;
-use ::common::{map_tls_err, SetupTls, DefaultTlsSetup};
-use ::{Connection, CmdFuture, Cmd};
+use ::error::MissingCapabilities;
+use ::{
+    Connection, CmdFuture, Cmd,
+    Domain, Capability, EsmtpKeyword,
+    map_tls_err, SetupTls, DefaultTlsSetup, EhloData
+};
 use ::io::{Io, Socket};
 use ::response::{Response, codes};
 
@@ -64,9 +67,26 @@ fn connection_already_secure_error_future() -> CmdFuture {
     return Box::new(fut);
 }
 
+const STARTTLS: &str = "STARTTLS";
+
 impl<S> Cmd for StartTls<S>
     where S: SetupTls
 {
+
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        caps.and_then(|ehlo_data| {
+            if ehlo_data.has_capability(STARTTLS) {
+                Some(())
+            } else {
+                None
+            }
+        }).ok_or_else(|| {
+            let mcap = Capability::from(EsmtpKeyword::from_str_unchecked(STARTTLS));
+            MissingCapabilities::new(vec![mcap])
+        })
+    }
 
     fn exec(self, con: Connection) -> CmdFuture {
         let mut io = con.into_inner();

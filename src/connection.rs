@@ -14,6 +14,7 @@ use ::common::{
     TlsConfig,
     SetupTls
 };
+use ::error::MissingCapabilities;
 use ::io::{Io, SmtpResult, Socket};
 
 
@@ -213,22 +214,13 @@ impl From<Socket> for Connection {
 }
 
 
-//TODO add a way for "checking" capabilities
-//Methods:
-//  1. Cmd::check(&EhloData) -> bool
-//  2. Cmd::Capabilities => &'static [ &'static str ]
-//      - but what is with dynamic requirements e.g. a improved Mail cmd could,
-//        require SMTPUTF8 for mailboxes which, well, require it
-//
-// Performance Considerations:
-//  most capabilities boil down to a few:
-//    - MIME8BIT, SMTPUTF8, AUTH, PIPELINING, STARTTLS, SIZE (+a few others)
-//  so it might make sense to have a BIT field for them
-//  also for SIZE, parsing the size and having a .size() -> usize method would make sense
-//  and for auth a .auth(kind: &str) -> bool
-//
+
 pub trait Cmd {
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>;
+
     fn exec(self, con: Connection) -> CmdFuture;
+
     fn boxed(self) -> BoxedCmd
         where Self: Sized + 'static
     {
@@ -251,9 +243,17 @@ pub trait SimpleCmd {
 pub type BoxedCmd = Box<TypeErasableCmd>;
 
 pub trait TypeErasableCmd {
+
     /// # Panics
     ///
-    /// panics if called more then once
+    /// may panic if called after `_only_once_exec` was
+    /// called
+    fn _check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>;
+
+    /// # Panics
+    ///
+    /// may panic if called more then once
     /// (but can't accept `self` instead of `&mut self`
     /// as it requires object-safety)
     ///
@@ -263,6 +263,13 @@ pub trait TypeErasableCmd {
 impl<C> TypeErasableCmd for Option<C>
     where C: Cmd
 {
+    fn _check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities> 
+    {
+        let me = self.as_ref().expect("_check_cmd_avilability called after _only_onece_exec");
+        me.check_cmd_avilability(caps)
+    }
+
     fn _only_once_exec(&mut self, con: Connection) -> CmdFuture {
         let me = self.take().expect("_only_once_exec called a second time");
         me.exec(con)
@@ -270,6 +277,12 @@ impl<C> TypeErasableCmd for Option<C>
 }
 
 impl Cmd for Box<TypeErasableCmd> {
+
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        self._check_cmd_avilability(caps)
+    }
 
     fn exec(mut self, con: Connection) -> CmdFuture {
         self._only_once_exec(con)

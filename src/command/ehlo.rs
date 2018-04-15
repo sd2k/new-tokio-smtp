@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use bytes::BufMut;
 use futures::Future;
 
+use ::error::MissingCapabilities;
 use ::{
     Domain, EhloData, SyntaxError, EhloParam,
     Cmd, Connection, CmdFuture, Io, Response, ClientIdentity
@@ -39,6 +40,12 @@ impl Into<ClientIdentity> for Ehlo {
 }
 
 impl Cmd for Ehlo {
+
+    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+       Ok(())
+    }
 
     fn exec(self, con: Connection) -> CmdFuture {
         let mut io = con.into_inner();

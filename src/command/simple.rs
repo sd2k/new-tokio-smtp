@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use bytes::{BytesMut, BufMut};
-use data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
 
+use ::data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
+use ::common::EhloData;
+use ::error::MissingCapabilities;
 use ::{Connection, CmdFuture, Cmd, SimpleCmd};
 use ::io::CR_LF;
 
@@ -10,6 +12,14 @@ use ::io::CR_LF;
 macro_rules! impl_simple_command {
     ($(for $name:ident => |&$self:ident, $buf:ident| $block:block;)*) => ($(
         impl Cmd for $name {
+
+            fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+                -> Result<(), MissingCapabilities>
+            {
+                //FIXME better imple
+                Ok(())
+            }
+
             #[inline]
             fn exec(self, con: Connection) -> CmdFuture {
                 con.send_simple_cmd(self)

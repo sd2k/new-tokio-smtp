@@ -2,7 +2,8 @@ use std::io as std_io;
 
 use futures::Future;
 
-use ::error::LogicError;
+use ::common::EhloData;
+use ::error::{LogicError, MissingCapabilities};
 use ::{Cmd, CmdFuture, Connection, Io};
 
 
@@ -10,6 +11,12 @@ use ::{Cmd, CmdFuture, Connection, Io};
 pub struct Reset;
 
 impl Cmd for Reset {
+
+    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+                -> Result<(), MissingCapabilities>
+    {
+        Ok(())
+    }
 
     fn exec(self, con: Connection) -> CmdFuture {
         let io = con.into_inner();

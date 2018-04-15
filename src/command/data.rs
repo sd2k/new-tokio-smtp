@@ -5,9 +5,9 @@ use futures::future::{self, Either, Future};
 use futures::stream::{self, Stream};
 use future_ext::ResultWithContextExt;
 
-use ::{Connection, CmdFuture, Cmd, Io};
+use ::{Connection, CmdFuture, Cmd, Io, EhloData};
 use ::response::codes;
-use ::error::LogicError;
+use ::error::{LogicError, MissingCapabilities};
 
 
 pub struct Data<S> {
@@ -34,6 +34,12 @@ impl<S> Data<S>
 impl<S: 'static> Cmd for Data<S>
     where S: Stream<Error=std_io::Error>, S::Item: Buf
 {
+
+    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        Ok(())
+    }
 
     fn exec(self, con: Connection) -> CmdFuture {
         let io = con.into_inner();

@@ -5,8 +5,10 @@ use bytes::BufMut;
 use futures::future::Future;
 use base64::encode;
 
-use ::{Connection, CmdFuture, Cmd, Io};
+use ::{Connection, CmdFuture, Cmd, Io, EhloData};
+use ::error::MissingCapabilities;
 use ::io::CR_LF;
+use super::validate_auth_capability;
 
 /// AUTH PLAIN smtp authentification based on rfc4954/rfc4616
 #[derive(Debug, Clone)]
@@ -91,18 +93,40 @@ impl AuthPlain {
 
 impl Cmd for AuthPlain {
 
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        validate_auth_capability(caps, "PLAIN")
+    }
+
     fn exec(self, con: Connection) -> CmdFuture {
         self.exec_ref(con)
     }
 }
 
 impl Cmd for Rc<AuthPlain> {
+
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        let me: &AuthPlain = &*self;
+        me.check_cmd_avilability(caps)
+    }
+
     fn exec(self, con: Connection) -> CmdFuture {
         self.exec_ref(con)
     }
 }
 
 impl Cmd for Arc<AuthPlain> {
+
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        let me: &AuthPlain = &*self;
+        me.check_cmd_avilability(caps)
+    }
+
     fn exec(self, con: Connection) -> CmdFuture {
         self.exec_ref(con)
     }

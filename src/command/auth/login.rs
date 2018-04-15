@@ -3,10 +3,10 @@ use futures::future::{self, Either, Future};
 use future_ext::ResultWithContextExt;
 use base64::encode;
 
-use ::{Connection, CmdFuture, Cmd, Io};
+use ::{Connection, CmdFuture, Cmd, Io, EhloData};
 use ::io::CR_LF;
-use ::error::LogicError;
-
+use ::error::{LogicError, MissingCapabilities};
+use super::validate_auth_capability;
 
 #[derive(Debug, Clone)]
 pub struct AuthLogin {
@@ -35,7 +35,14 @@ impl AuthLogin {
 
 }
 
+
 impl Cmd for AuthLogin {
+
+    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+        -> Result<(), MissingCapabilities>
+    {
+        validate_auth_capability(caps, "LOGIN")
+    }
 
     fn exec(self, con: Connection) -> CmdFuture {
         const CMD_BASE: &str = "AUTH LOGIN ";

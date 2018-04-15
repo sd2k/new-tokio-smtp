@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{self, Display, Debug};
+use ::data_types::Capability;
 use ::response::Response;
 
 #[derive(Debug)]
@@ -57,7 +58,62 @@ impl Display for LogicError {
 
         match *self {
             Custom(ref boxed) => Display::fmt(boxed, fter),
+            //FIXME better display impl
             _ => Debug::fmt(self, fter),
         }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct MissingCapabilities {
+    capabilities: Vec<Capability>
+}
+
+impl MissingCapabilities {
+
+    pub fn new(capabilities: Vec<Capability>) -> Self {
+        MissingCapabilities { capabilities }
+    }
+
+    pub fn capabilities(&self) -> &[Capability] {
+        &self.capabilities
+    }
+}
+
+impl Into<Vec<Capability>> for MissingCapabilities {
+    fn into(self) -> Vec<Capability> {
+        let MissingCapabilities { capabilities } = self;
+        capabilities
+    }
+}
+
+impl From<Vec<Capability>> for MissingCapabilities {
+    fn from(capabilities: Vec<Capability>) -> Self {
+        MissingCapabilities { capabilities }
+    }
+}
+
+impl Error for MissingCapabilities {
+    fn description(&self) -> &str {
+        "missing capabilities to run command"
+    }
+}
+
+impl Display for MissingCapabilities {
+
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        write!(fter, "missing capabilities:")?;
+        let mut first = true;
+        for cap in self.capabilities.iter() {
+            let str_cap = cap.as_str();
+            if first {
+                write!(fter, " {}", str_cap)?;
+            } else {
+                write!(fter, ", {}", str_cap)?;
+            }
+            first = false;
+        }
+        Ok(())
     }
 }
