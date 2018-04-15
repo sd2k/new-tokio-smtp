@@ -1,7 +1,13 @@
 [package]
+authors = ["Philipp Korber <p.korber@1aim.com>"]
 name = "new-tokio-smtp"
-version = "0.1.0"
-authors = ["Philipp Korber <philippkorber@gmail.com>"]
+description = "extendible smtp implementation for tokio"
+documentation = "https://docs.rs/new-tokio-smtp"
+keywords = ["smtp", "tokio", "mail", "rfc5321"]
+categories = []
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/1aim/new-tokio-smtp"
+version = "0.2.0"
 
 [dependencies]
 futures = "0.1"
