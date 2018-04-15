@@ -22,7 +22,7 @@ impl Cmd for Reset {
         let io = con.into_inner();
 
         let fut = io
-            .flush_line("RSET")
+            .flush_line_from_parts(&["RSET"])
             .and_then(Io::parse_response)
             // server should not, ever, answer with anything but 250, we can be tolerant and
             // accept all non-error codes but on error codes we have no way to handle it

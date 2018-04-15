@@ -1,10 +1,9 @@
 use std::io as std_io;
 
-use bytes::BufMut;
 use futures::{Poll, Future, Async};
 use tokio::io::AsyncWrite;
 
-use super::{Io, CR_LF};
+use super::Io;
 
 
 impl Io {
@@ -13,12 +12,8 @@ impl Io {
     }
 
     /// writes `cmd` and then `"\r\n"` to `buffer.input` and then calls `flush`
-    pub fn flush_line(mut self, line: &str) -> Flushing {
-        {
-            let out = self.out_buffer(line.len() + CR_LF.len());
-            out.put(line);
-            out.put(CR_LF);
-        }
+    pub fn flush_line_from_parts(mut self, line: &[&str]) -> Flushing {
+        self.write_line_from_parts(line);
         self.flush()
     }
 

@@ -54,6 +54,19 @@ impl Io {
         (socket, buffer, ehlo_data)
     }
 
+    /// writes all strings in `parts` to the output buffer followed by `"\r\n"`
+    pub fn write_line_from_parts(&mut self, parts: &[&str]) {
+        let len = parts
+            .iter()
+            .fold(CR_LF.len(), |sum, item| sum + item.len());
+
+        let buffer = self.out_buffer(len);
+        for part in parts {
+            buffer.put(*part);
+        }
+        buffer.put(CR_LF);
+    }
+
     pub fn socket_mut(&mut self) -> &mut Socket {
         &mut self.socket
     }

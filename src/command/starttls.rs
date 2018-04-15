@@ -119,7 +119,7 @@ impl<S> Cmd for StartTls<S>
         }
 
         let fut = io
-            .flush_line("STARTTLS")
+            .flush_line_from_parts(&["STARTTLS"])
             .and_then(Io::parse_response)
             .and_then(move |(io, smtp_result)| match smtp_result {
                 Err(response) => {

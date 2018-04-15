@@ -46,7 +46,7 @@ impl<S: 'static> Cmd for Data<S>
         let Data { source } = self;
 
         let fut = io
-            .flush_line("DATA")
+            .flush_line_from_parts(&["DATA"])
             .and_then(Io::parse_response)
             .ctx_and_then(move |io, response| {
                 if response.code() != codes::START_MAIL_DATA {

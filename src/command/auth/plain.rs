@@ -1,13 +1,11 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use bytes::BufMut;
-use futures::future::Future;
 use base64::encode;
 
-use ::{Connection, CmdFuture, Cmd, Io, EhloData};
+use ::{Connection, CmdFuture, Cmd, EhloData};
 use ::error::MissingCapabilities;
-use ::io::CR_LF;
+
 use super::validate_auth_capability;
 
 /// AUTH PLAIN smtp authentification based on rfc4954/rfc4616
@@ -68,26 +66,11 @@ impl AuthPlain {
 
     fn exec_ref(&self, con: Connection) -> CmdFuture {
         let auth_str = encode(&format!("{}\0{}\0{}",
-                               &*self.authorization_identity,
+                               &self.authorization_identity,
                                &self.authentication_identity,
                                &self.password));
 
-        const CMD_BASE: &str = "AUTH PLAIN ";
-
-        let mut io = con.into_inner();
-        let len_needed = CMD_BASE.len() + auth_str.len() + CR_LF.len();
-        {
-            let buf = io.out_buffer(len_needed);
-            buf.put(CMD_BASE);
-            buf.put(auth_str);
-            buf.put(CR_LF);
-        }
-
-        let fut = io.flush()
-            .and_then(Io::parse_response)
-            .map(|(io, res)| (Connection::from(io), res));
-
-        Box::new(fut)
+        con.send_simple_cmd(&["AUTH PLAIN ", auth_str.as_str()])
     }
 }
 

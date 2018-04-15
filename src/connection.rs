@@ -1,7 +1,6 @@
 use std::{io as std_io};
 use std::net::SocketAddr;
 
-use bytes::{BytesMut, BufMut};
 use futures::future::{self, Future};
 use tokio::io::{shutdown, Shutdown};
 
@@ -139,13 +138,10 @@ impl Connection {
         cmd.exec(self)
     }
 
-    pub fn send_simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
+    pub fn send_simple_cmd(self, parts: &[&str]) -> CmdFuture {
         let mut io = self.into_inner();
-        {
-            let buffer = io.out_buffer(1024);
-            cmd.write_cmd(buffer);
-            buffer.put("\r\n");
-        }
+
+        io.write_line_from_parts(parts);
 
         let fut = io
             .flush()
@@ -228,17 +224,6 @@ pub trait Cmd {
     }
 }
 
-pub trait SimpleCmd {
-
-    /// writes a simple command to the buffer
-    ///
-    /// The simple command should be a one-line command.
-    /// After this function is called through a call to
-    /// `Connection::simple_cmd` the `Connection` _will_
-    /// write `"\r\n"`.
-    ///
-    fn write_cmd(&self, buf: &mut BytesMut);
-}
 
 pub type BoxedCmd = Box<TypeErasableCmd>;
 
