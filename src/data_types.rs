@@ -53,11 +53,13 @@ pub struct Domain(IgnoreAsciiCaseString);
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct AddressLiteral(IgnoreAsciiCaseString);
 
+//if parsed can not be an empty string
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ForwardPath(String);
 
+//even if parsed can be an empty string
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ReversePath(Option<String>);
+pub struct ReversePath(String);
 
 macro_rules! impl_str_wrapper {
     ($($name:ident),*) => ($(
@@ -65,6 +67,13 @@ macro_rules! impl_str_wrapper {
         impl $name {
             pub fn as_str(&self) -> &str {
                 self.0.as_ref()
+            }
+
+            pub fn from_str_unchecked<I>(data: I) -> Self
+                where I: Into<String>
+            {
+                let string = data.into();
+                $name(string.into())
             }
         }
 
@@ -102,40 +111,16 @@ macro_rules! impl_str_wrapper {
 }
 
 
-impl_str_wrapper!(Domain, EhloParam, AddressLiteral, EsmtpKeyword, EsmtpValue);
+impl_str_wrapper!(
+    Domain, EhloParam, AddressLiteral, EsmtpKeyword, EsmtpValue,
+    ForwardPath, ReversePath
+);
 
-impl ForwardPath {
-
-    /// creates a ForwardPath from a string repr. of an mailbox without checking it
-    ///
-    /// This mothod does not check if the string is grammatically correct
-    pub fn mailbox_unchecked<I>(mailbox: I) -> Self
-        where I: Into<String>
-    {
-        ForwardPath(mailbox.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
 
 impl ReversePath {
 
     pub fn empty() -> Self {
-        ReversePath(None)
-    }
-
-    pub fn mailbox_unchecked<I>(mailbox: I) -> Self
-        where I: Into<String>
-    {
-        ReversePath(Some(mailbox.into()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.0.as_ref()
-            .map(|os| &**os)
-            .unwrap_or("")
+        ReversePath("".to_owned())
     }
 }
 
@@ -455,6 +440,12 @@ mod test {
             let a: Domain = "afFen".parse().unwrap();
             let s: String = a.into();
             assert_eq!(s, "affen")
+        }
+
+        #[test]
+        fn from_str_unchecked() {
+            let a = Domain::from_str_unchecked("hy");
+            assert_eq!(a, "hy");
         }
     }
 }
