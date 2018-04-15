@@ -20,8 +20,7 @@ use ::io::{Io, SmtpResult, Socket};
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
 
 pub struct Connection {
-    io: Io,
-    ehlo: Option<EhloData>,
+    io: Io
 }
 
 
@@ -140,7 +139,7 @@ impl Connection {
     }
 
     pub fn send_simple_cmd<C: SimpleCmd>(self, cmd: C) -> CmdFuture {
-        let (mut io, ehlo) = self.split();
+        let mut io = self.into_inner();
         {
             let buffer = io.out_buffer(1024);
             cmd.write_cmd(buffer);
@@ -150,7 +149,7 @@ impl Connection {
         let fut = io
             .flush()
             .and_then(Io::parse_response)
-            .map(|(io, response)| (Self::from((io, ehlo)), response));
+            .map(|(io, response)| (Connection::from(io), response));
 
         Box::new(fut)
     }
@@ -166,23 +165,21 @@ impl Connection {
     pub fn has_capability<C>(&self, cap: C) -> bool
         where C: AsRef<str>
     {
-        self.ehlo.as_ref().map(|ehlo| {
-            ehlo.has_capability(cap)
-        }).unwrap_or(false)
+        self.io.has_capability(cap)
     }
 
     pub fn ehlo_data(&self) -> Option<&EhloData> {
-        self.ehlo.as_ref()
+        self.io.ehlo_data()
     }
 
-    pub fn split(self) -> (Io, Option<EhloData>) {
-        let Connection { io, ehlo } = self;
-        (io, ehlo)
+    pub fn into_inner(self) -> Io {
+        let Connection { io } = self;
+        io
     }
 
     pub fn shutdown(self) -> Shutdown<Socket> {
-        let (io, _) = self.split();
-        let (socket, _) = io.split();
+        let io = self.into_inner();
+        let (socket, _, _) = io.split();
         shutdown(socket)
     }
 
@@ -204,19 +201,14 @@ impl Connection {
 
 impl From<Io> for Connection {
     fn from(io: Io) -> Self {
-        Connection { io, ehlo: None }
+        Connection { io }
     }
 }
 
-impl From<(Io, EhloData)> for Connection {
-    fn from((io, ehlo): (Io, EhloData)) -> Self {
-        Connection { io, ehlo: Some(ehlo) }
-    }
-}
-
-impl From<(Io, Option<EhloData>)> for Connection {
-    fn from((io, ehlo): (Io, Option<EhloData>)) -> Self {
-        Connection { io, ehlo }
+impl From<Socket> for Connection {
+    fn from(socket: Socket) -> Self {
+        let io = Io::from(socket);
+        Connection { io }
     }
 }
 

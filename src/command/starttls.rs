@@ -8,7 +8,7 @@ use tokio_tls::TlsConnectorExt;
 use ::data_types::Domain;
 use ::common::{map_tls_err, SetupTls, DefaultTlsSetup};
 use ::{Connection, CmdFuture, Cmd};
-use ::io::{Io, Socket, Buffers};
+use ::io::{Io, Socket};
 use ::response::{Response, codes};
 
 
@@ -69,7 +69,7 @@ impl<S> Cmd for StartTls<S>
 {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (mut io, ehlo_data) = con.split();
+        let mut io = con.into_inner();
         let StartTls { sni_domain, setup_tls } = self;
 
         let was_mock =
@@ -93,7 +93,7 @@ impl<S> Cmd for StartTls<S>
             };
 
         if was_mock {
-            let con = Connection::from((io, ehlo_data));
+            let con = Connection::from(io);
             let fut = future::ok((con, Ok(tls_done_result())));
             return Box::new(fut);
         }
@@ -103,7 +103,7 @@ impl<S> Cmd for StartTls<S>
             .and_then(Io::parse_response)
             .and_then(move |(io, smtp_result)| match smtp_result {
                 Err(response) => {
-                    let con = Connection::from((io, ehlo_data));
+                    let con = Connection::from(io);
                     Either::A(future::ok((con, Err(response))))
                 },
                 Ok(_) => {
@@ -114,7 +114,7 @@ impl<S> Cmd for StartTls<S>
                         |err| Either::A(future::err(map_tls_err(err)))
                     );
 
-                    let (socket, _buffer) = io.split();
+                    let (socket, _buffer, _ehlo_data) = io.split();
                     let stream = match socket {
                         Socket::Insecure(stream) => stream,
                         _ => unreachable!()
@@ -125,8 +125,7 @@ impl<S> Cmd for StartTls<S>
                         .map_err(map_tls_err)
                         .map(move |stream| {
                             let socket = Socket::Secure(stream);
-                            let io = Io::from((socket, Buffers::new()));
-                            let con = Connection::from((io, None));
+                            let con = Connection::from(socket);
                             (con, Ok(tls_done_result()))
                         });
 

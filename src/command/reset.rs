@@ -12,7 +12,7 @@ pub struct Reset;
 impl Cmd for Reset {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (io, ehlo) = con.split();
+        let io = con.into_inner();
 
         let fut = io
             .flush_line("RSET")
@@ -32,7 +32,7 @@ impl Cmd for Reset {
                     Err(std_io::Error::new(std_io::ErrorKind::Other, logic_err))
                 }
             })
-            .map(move |(io, result)| (Connection::from((io, ehlo)), result));
+            .map(move |(io, result)| (Connection::from(io), result));
 
         Box::new(fut)
 

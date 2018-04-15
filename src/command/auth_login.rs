@@ -44,7 +44,7 @@ impl Cmd for AuthLogin {
         //3. send| <base64password>
         //4. recv| 235 2.7.0 Accepted
 
-        let (mut io, ehlo) = con.split();
+        let mut io = con.into_inner();
         let AuthLogin { username, password } = self;
 
         let len_needed = CMD_BASE.len() + username.len() + CR_LF.len();
@@ -68,7 +68,7 @@ impl Cmd for AuthLogin {
                     Either::B(fut)
                 }
             })
-            .map(move |(io, res)| (Connection::from((io, ehlo)), res));
+            .map(move |(io, res)| (Connection::from(io), res));
 
         Box::new(fut)
 

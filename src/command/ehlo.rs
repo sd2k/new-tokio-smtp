@@ -41,7 +41,7 @@ impl Into<ClientIdentity> for Ehlo {
 impl Cmd for Ehlo {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (mut io, _ehlo) = con.split();
+        let mut io = con.into_inner();
 
         let str_me = match *self.identity() {
             ClientIdentity::Domain(ref domain) => domain.as_str(),
@@ -59,13 +59,14 @@ impl Cmd for Ehlo {
         let fut = io
             .flush()
             .and_then(Io::parse_response)
-            .and_then(|(io, result)| match result {
-                Err(response) => Ok((Connection::from((io, None)), Err(response))),
+            .and_then(|(mut io, result)| match result {
+                Err(response) => Ok((Connection::from(io), Err(response))),
                 Ok(response) => {
                     let ehlo = parse_ehlo_response(&response)
                         .map_err(|err| std_io::Error::new(std_io::ErrorKind::Other, err))?;
 
-                    Ok((Connection::from((io, Some(ehlo))), Ok(response)))
+                    io.set_ehlo_data(ehlo);
+                    Ok((Connection::from(io), Ok(response)))
                 }
             });
 

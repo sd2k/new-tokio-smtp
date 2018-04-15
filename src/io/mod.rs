@@ -4,6 +4,7 @@ use bytes::buf::BufMut;
 use tokio_tls::TlsStream;
 use tokio::net::TcpStream;
 
+use ::common::EhloData;
 use ::response::Response;
 use ::error::LogicError;
 
@@ -37,6 +38,7 @@ pub type SmtpResult = Result<Response, LogicError>;
 pub struct Io {
     socket: Socket,
     buffer: Buffers,
+    ehlo_data: Option<EhloData>,
 }
 
 impl Io {
@@ -47,9 +49,9 @@ impl Io {
        \\---------------------------------------------------------------//
     */
 
-    pub fn split(self) -> (Socket, Buffers) {
-        let Io { socket, buffer } = self;
-        (socket, buffer)
+    pub fn split(self) -> (Socket, Buffers, Option<EhloData>) {
+        let Io { socket, buffer, ehlo_data } = self;
+        (socket, buffer, ehlo_data)
     }
 
     pub fn socket_mut(&mut self) -> &mut Socket {
@@ -74,11 +76,45 @@ impl Io {
         &mut self.buffer.input
     }
 
+    pub fn ehlo_data(&self) -> Option<&EhloData> {
+        self.ehlo_data.as_ref()
+    }
+
+    pub fn set_ehlo_data(&mut self, data: EhloData) {
+        self.ehlo_data = Some(data);
+    }
+
+    pub fn has_capability<C>(&self, cap: C) -> bool
+        where C: AsRef<str>
+    {
+        self.ehlo_data().map(|ehlo| {
+            ehlo.has_capability(cap)
+        }).unwrap_or(false)
+    }
+
+}
+
+impl From<(Socket, Buffers, Option<EhloData>)> for Io {
+    fn from((socket, buffer, ehlo_data): (Socket, Buffers, Option<EhloData>)) -> Self {
+        Io { socket, buffer, ehlo_data }
+    }
+}
+
+impl From<(Socket, Buffers, EhloData)> for Io {
+    fn from((socket, buffer, ehlo_data): (Socket, Buffers, EhloData)) -> Self {
+        Io { socket, buffer, ehlo_data: Some(ehlo_data) }
+    }
 }
 
 impl From<(Socket, Buffers)> for Io {
     fn from((socket, buffer): (Socket, Buffers)) -> Self {
-        Io { socket, buffer }
+        Io { socket, buffer, ehlo_data: None }
+    }
+}
+
+impl From<Socket> for Io {
+    fn from(socket: Socket) -> Self {
+        Io { socket, buffer: Buffers::new(), ehlo_data: None }
     }
 }
 
@@ -86,7 +122,7 @@ impl From<TcpStream> for Io {
     fn from(stream: TcpStream) -> Self {
         let socket = Socket::Insecure(stream);
         let buffers = Buffers::new();
-        Io::from((socket, buffers))
+        Io::from((socket, buffers, None))
     }
 }
 
@@ -94,7 +130,7 @@ impl From<TlsStream<TcpStream>> for Io {
     fn from(stream: TlsStream<TcpStream>) -> Self {
         let socket = Socket::Secure(stream);
         let buffers = Buffers::new();
-        Io::from((socket, buffers))
+        Io::from((socket, buffers, None))
     }
 }
 

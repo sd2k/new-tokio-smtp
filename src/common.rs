@@ -140,7 +140,7 @@ pub(crate) fn map_tls_err(err: native_tls::Error) -> std_io::Error {
     )
 }
 
-
+#[derive(Debug, Clone)]
 pub struct EhloData {
     domain: Domain,
     data: HashMap<Capability, Vec<EhloParam>>

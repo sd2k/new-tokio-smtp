@@ -36,7 +36,7 @@ impl<S: 'static> Cmd for Data<S>
 {
 
     fn exec(self, con: Connection) -> CmdFuture {
-        let (io, ehlo) = con.split();
+        let io = con.into_inner();
         let Data { source } = self;
 
         let fut = io
@@ -54,7 +54,7 @@ impl<S: 'static> Cmd for Data<S>
 
                 Either::B(fut)
             })
-            .map(move |(io, result)| (Connection::from((io, ehlo)), result));
+            .map(move |(io, result)| (Connection::from(io), result));
 
         Box::new(fut)
     }
