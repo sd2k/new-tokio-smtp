@@ -19,6 +19,7 @@ use ::io::{Io, SmtpResult, Socket};
 
 pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
 
+#[derive(Debug)]
 pub struct Connection {
     io: Io
 }
