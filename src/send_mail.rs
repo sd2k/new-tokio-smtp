@@ -37,7 +37,7 @@ Problems:
         - have a SpecMailAddress<Spec>(MailAddress, PhantomData<Spec>) and a MailAddress
         - have a MailBox::from_str_unchecked or similar
         - indicates if it's us-ascii or utf-8
-        - comparison might be added later but is dificult for a number of reasons
+        - comparison might be added later but is difficult for a number of reasons
             - some special comparison algorithms like eq_gmail (ignores '.', case and + suffixes)
         - a form of "as_parts" conversion which allow encoding with different schemes
             - e.g. "tom@domain.de" => ("tom", "@", "domain.de") => Text "tom", MarkFWS, Text "@", etc.

@@ -12,7 +12,7 @@ pub struct Reset;
 
 impl Cmd for Reset {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
                 -> Result<(), MissingCapabilities>
     {
         Ok(())

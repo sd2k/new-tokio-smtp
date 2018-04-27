@@ -8,7 +8,7 @@ use ::error::MissingCapabilities;
 
 use super::validate_auth_capability;
 
-/// AUTH PLAIN smtp authentification based on rfc4954/rfc4616
+/// AUTH PLAIN smtp authentication based on rfc4954/rfc4616
 #[derive(Debug, Clone)]
 pub struct AuthPlain {
     authorization_identity: String,
@@ -76,7 +76,7 @@ impl AuthPlain {
 
 impl Cmd for AuthPlain {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         validate_auth_capability(caps, "PLAIN")
@@ -89,11 +89,11 @@ impl Cmd for AuthPlain {
 
 impl Cmd for Rc<AuthPlain> {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         let me: &AuthPlain = &*self;
-        me.check_cmd_avilability(caps)
+        me.check_cmd_availability(caps)
     }
 
     fn exec(self, con: Connection) -> CmdFuture {
@@ -103,11 +103,11 @@ impl Cmd for Rc<AuthPlain> {
 
 impl Cmd for Arc<AuthPlain> {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         let me: &AuthPlain = &*self;
-        me.check_cmd_avilability(caps)
+        me.check_cmd_availability(caps)
     }
 
     fn exec(self, con: Connection) -> CmdFuture {

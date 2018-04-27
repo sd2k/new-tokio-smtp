@@ -36,7 +36,7 @@ impl AuthLogin {
 
 impl Cmd for AuthLogin {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         validate_auth_capability(caps, "LOGIN")

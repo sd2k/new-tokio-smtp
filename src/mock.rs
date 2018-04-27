@@ -85,12 +85,12 @@ fn check_crlf_start(tail: &[u8]) -> &[u8] {
     let mut tail = tail;
     let length = tail.len();
     if length >= 1 {
-        assert!(tail[0] == b'\r', "unexpected data, expeced '\\r' got {:?} in {}",
+        assert!(tail[0] == b'\r', "unexpected data, expected '\\r' got {:?} in {}",
             tail[0] as char, String::from_utf8_lossy(tail));
         tail = &tail[1..];
     }
     if length >= 2 {
-        assert!(tail[0] == b'\n', "unexpected data, expeced '\\n' got {:?}in {}",
+        assert!(tail[0] == b'\n', "unexpected data, expected '\\n' got {:?}in {}",
             tail[0] as char, String::from_utf8_lossy(tail));
         tail = &tail[1..];
     }
@@ -126,7 +126,7 @@ impl State {
             State::ServerIsWorking { ref waker, ..} => waker,
             State::ClientIsWorking { ref waker, ..} => waker,
             State::NeedNewAction { ref waker, ..} => waker,
-            _ => panic!("trying to shedule wakup on shutdown stream")
+            _ => panic!("trying to schedule wake up on shutdown stream")
         }
     }
 }
@@ -139,9 +139,9 @@ pub struct MockSocket {
     check_shutdown: bool
 }
 
-/// MockSocket going through a pre-coded interlocked clinet-server conversation
+/// MockSocket going through a pre-coded interlocked client-server conversation
 ///
-/// The `client` is the part of the programm reading to the socked using `poll_read`
+/// The `client` is the part of the program reading to the socked using `poll_read`
 /// and writing using `poll_write`, the server is the mock doing thinks in reserve,
 /// i.e. reading when the client writes and writing when the server reads.
 ///
@@ -196,10 +196,10 @@ impl MockSocket {
             .unwrap()
     }
 
-    /// has a 1/16 chance to return `NotReady` and shedule the current `Task` to be notified later
+    /// has a 1/16 chance to return `NotReady` and schedule the current `Task` to be notified later
     ///
     /// This is used to emulate that the connection is sometimes not ready jet
-    /// e.g. because of network atencies. Yes, this makes the tests not 100% determenistic,
+    /// e.g. because of network latencies. Yes, this makes the tests not 100% deterministic,
     /// but to get them in that direction and still test delays without hand encoding them
     /// would requires using something similar to `quick check`
     pub fn maybe_inject_not_ready(&mut self) -> Poll<(), std_io::Error> {
@@ -284,7 +284,7 @@ impl Drop for MockSocket {
                 else { panic!("connection was not shutdown"); }
             }
 
-            assert!(self.conversation.is_empty(), "premeature cancelation of conversation");
+            assert!(self.conversation.is_empty(), "premature cancellation of conversation");
         }
     }
 }
@@ -354,7 +354,7 @@ impl Write for MockSocket {
 //
 // [*]: the client might call read until it read all "ready" data, even if the
 //      read data already did contain all data it needs, so we can not panic here
-//      through it might lifelock the client in other siturations, so we need to
+//      through it might life lock the client in other situations, so we need to
 //      build in a timeout into all tests
 //
 // on read:
@@ -379,7 +379,7 @@ impl Write for MockSocket {
 //   on before read
 //   on read after transmitting >= 1 byte
 //   on before write
-//   on write after trasmitting >= 1 byte
+//   on write after transmitting >= 1 byte
 //
 // on NotReady return:
 //   send Task to DelayedWakerThread
@@ -483,7 +483,7 @@ impl AsyncWrite for MockSocket {
     ///
     /// - Can always return with `NotReady` before doing anything.
     /// - panics if the state is `ServerIsWorking` or `ShutdownOrPoison`
-    /// - on `NeedNewAction` it advances the state to the next extion and
+    /// - on `NeedNewAction` it advances the state to the next action and
     ///   returns `NotReady`, _or_ if there is no further action returns
     ///   `Ready`
     /// - always returns `Ready` in the `ClientIsWorking` state if
@@ -493,7 +493,7 @@ impl AsyncWrite for MockSocket {
     ///   of both). If it is found that all bytes where parsed as expected
     ///   the state is advanced to `NeedNewAction`. If more bytes where
     ///   read then they stay in the buffer which will cause a panic
-    ///   when advencing to the next action  if the next action is
+    ///   when advancing to the next action  if the next action is
     ///   not another `Client` action.
     ///
     ///
@@ -535,7 +535,7 @@ impl AsyncWrite for MockSocket {
         }
     }
 
-    /// `shudown` impl
+    /// `shutdown` impl
     ///
     /// # Implementation Details
     ///

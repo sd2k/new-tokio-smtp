@@ -35,7 +35,7 @@ impl<S: 'static> Cmd for Data<S>
     where S: Stream<Error=std_io::Error>, S::Item: Buf
 {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())

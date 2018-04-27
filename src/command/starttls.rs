@@ -48,7 +48,7 @@ impl<S> StartTls<S>
 }
 
 /// STARTTLS is the only command which does not have a "final" response,
-/// after it's intermediate response it will start the tls handchake and
+/// after it's intermediate response it will start the tls handshake and
 /// after that nothing is ever send back, but this API _always_ has a
 /// response for a request, so we create a "fake" response (`"220 Ready"`)
 fn tls_done_result() -> Response {
@@ -73,7 +73,7 @@ impl<S> Cmd for StartTls<S>
     where S: SetupTls
 {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         caps.and_then(|ehlo_data| {

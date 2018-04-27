@@ -41,7 +41,7 @@ impl Into<ClientIdentity> for Ehlo {
 
 impl Cmd for Ehlo {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
        Ok(())

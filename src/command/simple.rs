@@ -10,7 +10,7 @@ pub struct Quit;
 
 impl Cmd for Quit {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())
@@ -26,7 +26,7 @@ pub struct Noop;
 
 impl Cmd for Noop {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())
@@ -60,7 +60,7 @@ impl Mail {
 
 impl Cmd for Mail {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())
@@ -89,7 +89,7 @@ impl Recipient {
 
 impl Cmd for Recipient {
 
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())
@@ -124,7 +124,7 @@ pub struct Verify {
 }
 
 impl Cmd for Verify {
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         Ok(())
@@ -141,7 +141,7 @@ pub struct Help {
 }
 
 impl Cmd for Help {
-    fn check_cmd_avilability(&self, _caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
         //TODO check if this is always enabled

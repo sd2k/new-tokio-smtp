@@ -152,7 +152,7 @@ impl Connection {
         Box::new(fut)
     }
 
-    /// returns true if the capability is known to be supported, false elsewise
+    /// returns true if the capability is known to be supported, false else wise
     ///
     /// The capability is know to be supported if the connection has EhloData and
     /// it was in the ehlo data (as a ehlo-keyword in one of the ehlo-lines after
@@ -220,7 +220,7 @@ impl From<Socket> for Connection {
 
 
 pub trait Cmd {
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>;
 
     fn exec(self, con: Connection) -> CmdFuture;
@@ -241,7 +241,7 @@ pub trait TypeErasableCmd {
     ///
     /// may panic if called after `_only_once_exec` was
     /// called
-    fn _check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn _check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>;
 
     /// # Panics
@@ -256,11 +256,11 @@ pub trait TypeErasableCmd {
 impl<C> TypeErasableCmd for Option<C>
     where C: Cmd
 {
-    fn _check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn _check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
-        let me = self.as_ref().expect("_check_cmd_avilability called after _only_onece_exec");
-        me.check_cmd_avilability(caps)
+        let me = self.as_ref().expect("_check_cmd_availability called after _only_onece_exec");
+        me.check_cmd_availability(caps)
     }
 
     fn _only_once_exec(&mut self, con: Connection) -> CmdFuture {
@@ -271,10 +271,10 @@ impl<C> TypeErasableCmd for Option<C>
 
 impl Cmd for Box<TypeErasableCmd> {
 
-    fn check_cmd_avilability(&self, caps: Option<&EhloData>)
+    fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
-        self._check_cmd_avilability(caps)
+        self._check_cmd_availability(caps)
     }
 
     fn exec(mut self, con: Connection) -> CmdFuture {
