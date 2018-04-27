@@ -85,11 +85,13 @@ fn check_crlf_start(tail: &[u8]) -> &[u8] {
     let mut tail = tail;
     let length = tail.len();
     if length >= 1 {
-        assert!(tail[0] == b'\r', "unexpected data");
+        assert!(tail[0] == b'\r', "unexpected data, expeced '\\r' got {:?} in {}",
+            tail[0] as char, String::from_utf8_lossy(tail));
         tail = &tail[1..];
     }
     if length >= 2 {
-        assert!(tail[0] == b'\n', "unexpected data");
+        assert!(tail[0] == b'\n', "unexpected data, expeced '\\n' got {:?}in {}",
+            tail[0] as char, String::from_utf8_lossy(tail));
         tail = &tail[1..];
     }
 
@@ -233,7 +235,8 @@ impl MockSocket {
         match actor {
             Actor::Server => {
                 // 1. data into() buffer
-                assert!(buffer.is_empty(), "buffer had remaining input");
+                assert!(buffer.is_empty(), "buffer had remaining input: {:?}",
+                   String::from_utf8_lossy(buffer.as_ref()));
                 buffer.reserve(data.len());
                 match data {
                     ActionData::Lines(lines) => {

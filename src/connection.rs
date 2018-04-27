@@ -203,6 +203,13 @@ impl From<Io> for Connection {
     }
 }
 
+impl From<Connection> for Io {
+    fn from(con: Connection) -> Self {
+        let Connection { io } = con;
+        io
+    }
+}
+
 impl From<Socket> for Connection {
     fn from(socket: Socket) -> Self {
         let io = Io::from(socket);
@@ -250,7 +257,7 @@ impl<C> TypeErasableCmd for Option<C>
     where C: Cmd
 {
     fn _check_cmd_avilability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities> 
+        -> Result<(), MissingCapabilities>
     {
         let me = self.as_ref().expect("_check_cmd_avilability called after _only_onece_exec");
         me.check_cmd_avilability(caps)

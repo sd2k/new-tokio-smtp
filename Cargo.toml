@@ -19,8 +19,10 @@ native-tls = "0.1.5"
 base64 = "0.6"
 
 rand = { version="0.4.2", optional=true }
+vec1 = { git="https://github.com/1aim/vec1", optional=true }
 
 [features]
-default = []
+default = ['send_mail']
+send_mail = ['vec1']
 mock_support = []
 mock_impl = ["mock_support", "rand"]

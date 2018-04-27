@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fmt::{self, Display, Debug};
-use ::data_types::Capability;
+use ::data_types::{Capability, EsmtpKeyword};
 use ::response::Response;
 
 #[derive(Debug)]
@@ -71,6 +71,14 @@ pub struct MissingCapabilities {
 }
 
 impl MissingCapabilities {
+
+    pub fn new_from_str_unchecked<I>(data: I) -> Self
+        where I: Into<String>
+    {
+        MissingCapabilities::new(vec![
+            Capability::from(EsmtpKeyword::from_str_unchecked(data.into()))
+        ])
+    }
 
     pub fn new(capabilities: Vec<Capability>) -> Self {
         MissingCapabilities { capabilities }

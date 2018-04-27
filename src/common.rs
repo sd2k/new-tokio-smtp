@@ -175,6 +175,11 @@ impl EhloData {
 
 }
 
+impl From<(Domain, HashMap<Capability, Vec<EhloParam>>)> for EhloData {
+    fn from((domain, map): (Domain, HashMap<Capability, Vec<EhloParam>>)) -> Self {
+        EhloData::new(domain, map)
+    }
+}
 
 impl Into<(Domain, HashMap<Capability, Vec<EhloParam>>)> for EhloData {
     fn into(self) -> (Domain, HashMap<Capability, Vec<EhloParam>>) {
