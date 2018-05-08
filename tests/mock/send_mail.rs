@@ -37,7 +37,7 @@ fn creates_the_right_chain() {
             Mail::new(EncodingRequirement::None, Vec::from("the data\r\n.stashed\r\n"))
         );
 
-    con.send_mail(envelop).unwrap()
+    con.send_mail(envelop)
         .and_then(|(con, _)| con.quit())
         .wait().unwrap();
 }
@@ -69,7 +69,7 @@ fn uses_smtputf8_for_internationalized_mail_addresses() {
             Mail::new(EncodingRequirement::None, Vec::from("the data\r\n.stashed\r\n"))
         );
 
-    con.send_mail(envelop).unwrap()
+    con.send_mail(envelop)
         .and_then(|(con, _)| con.quit())
         .wait().unwrap();
 }

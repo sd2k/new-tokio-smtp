@@ -1,14 +1,15 @@
 use std::{io as std_io};
 
-use futures::future::{self, Future};
+use futures::future::{self, Future, Either, FutureResult};
 use tokio::io::{shutdown, Shutdown};
 
 use ::common::EhloData;
-use ::error::MissingCapabilities;
+use ::error::{LogicError, MissingCapabilities};
 use ::io::{Io, SmtpResult, Socket};
 
-
-pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error> + Send + 'static>;
+pub type CmdFutureItem = (Connection, SmtpResult);
+pub type CmdFutureError = std_io::Error;
+pub type CmdFuture = Box<Future<Item=CmdFutureItem, Error=CmdFutureError> + Send + 'static>;
 
 #[derive(Debug)]
 pub struct Connection {
@@ -18,8 +19,14 @@ pub struct Connection {
 
 impl Connection {
 
-    pub fn send<C: Cmd>(self, cmd: C) -> CmdFuture {
-        cmd.exec(self)
+    pub fn send<C: Cmd>(self, cmd: C)
+        -> Either<CmdFuture, FutureResult<CmdFutureItem, CmdFutureError>>
+    {
+        if let Err(err) = cmd.check_cmd_availability(self.io.ehlo_data()) {
+            Either::B(future::ok((self, Err(LogicError::MissingCapabilities(err)))))
+        } else {
+            Either::A(cmd.exec(self))
+        }
     }
 
     pub fn send_simple_cmd(self, parts: &[&str]) -> CmdFuture {
@@ -68,7 +75,7 @@ impl Connection {
     /// sends Quit to the server and then shuts down the socket
     pub fn quit(self)
         -> future::AndThen<
-            CmdFuture,
+            Either<CmdFuture, FutureResult<CmdFutureItem, CmdFutureError>>,
             Shutdown<Socket>,
             fn((Connection, SmtpResult)) -> Shutdown<Socket>>
     {
@@ -102,7 +109,7 @@ impl From<Socket> for Connection {
 
 
 
-pub trait Cmd: 'static {
+pub trait Cmd: Send + 'static {
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>;
 
@@ -116,7 +123,7 @@ pub trait Cmd: 'static {
 }
 
 
-pub type BoxedCmd = Box<TypeErasableCmd>;
+pub type BoxedCmd = Box<TypeErasableCmd + Send>;
 
 pub trait TypeErasableCmd {
 
@@ -152,7 +159,7 @@ impl<C> TypeErasableCmd for Option<C>
     }
 }
 
-impl Cmd for Box<TypeErasableCmd> {
+impl Cmd for BoxedCmd {
 
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>

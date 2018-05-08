@@ -48,14 +48,14 @@ Temporary Solution:
 */
 use std::{io as std_io};
 
-use futures::Future;
+use futures::future::{self, Either, Future, FutureResult};
 use vec1::Vec1;
 
 use ::{Cmd, Connection};
+use ::error::{LogicError, MissingCapabilities};
 use ::chain::{chain, OnError, HandleErrorInChain};
 use ::data_types::{ReversePath, ForwardPath};
 use ::command::{self, params_with_smtputf8};
-use ::error::{LogicError, MissingCapabilities};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EncodingRequirement {
@@ -204,12 +204,11 @@ impl From<MailAddress> for ForwardPath {
 }
 
 pub type MailSendResult = Result<(), (usize, LogicError)>;
+pub type MailSendFuture = Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>;
 
 pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     //TODO better error
-    -> Result<
-        Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error>>,
-        (Connection, MissingCapabilities)>
+    -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>
     where H: HandleErrorInChain
 {
     let use_smtputf8 =  envelop.needs_smtputf8();
@@ -218,12 +217,12 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     let check_mime_8bit_support =
         !use_smtputf8 && mail.encoding_requirement() == EncodingRequirement::Mime8bit;
 
-    if use_smtputf8 && !con.has_capability("SMTPUTF8") {
-        return Err((con, MissingCapabilities::new_from_str_unchecked("SMTPUTF8")));
-    }
-
-    if check_mime_8bit_support && !con.has_capability("8BITMIME") {
-        return Err((con, MissingCapabilities::new_from_str_unchecked("SMTPUTF8")));
+    if (use_smtputf8 && !con.has_capability("SMTPUTF8"))
+       || (check_mime_8bit_support && !con.has_capability("8BITMIME"))
+    {
+        return Either::B(future::ok(
+            (con, Err((0, MissingCapabilities::new_from_str_unchecked("SMTPUTF8").into())))
+        ));
     }
 
     let reverse_path = from.map(ReversePath::from)
@@ -247,23 +246,19 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
 
     cmd_chain.push(command::Data::from_buf(mail.into_raw_data()).boxed());
 
-    Ok(chain(con, cmd_chain, on_error))
+    Either::A(chain(con, cmd_chain, on_error))
 }
 
 
 pub trait ConSendMailExt {
 
     fn send_mail(self, envelop: MailEnvelop)
-        -> Result<
-            Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error>>,
-            (Connection, MissingCapabilities)>;
+        -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>;
 }
 
 impl ConSendMailExt for Connection {
     fn send_mail(self, envelop: MailEnvelop)
-        -> Result<
-            Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error>>,
-            (Connection, MissingCapabilities)>
+        -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>
     {
         send_mail(self, envelop, OnError::StopAndReset)
     }

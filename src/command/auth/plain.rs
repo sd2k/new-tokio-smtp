@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::sync::Arc;
 
 use base64::encode;
@@ -80,20 +79,6 @@ impl Cmd for AuthPlain {
         -> Result<(), MissingCapabilities>
     {
         validate_auth_capability(caps, "PLAIN")
-    }
-
-    fn exec(self, con: Connection) -> CmdFuture {
-        self.exec_ref(con)
-    }
-}
-
-impl Cmd for Rc<AuthPlain> {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
-        let me: &AuthPlain = &*self;
-        me.check_cmd_availability(caps)
     }
 
     fn exec(self, con: Connection) -> CmdFuture {

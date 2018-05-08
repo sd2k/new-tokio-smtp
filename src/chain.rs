@@ -1,5 +1,5 @@
 use std::io as std_io;
-use std::rc::Rc;
+use std::sync::Arc;
 use futures::future::{self, Future, Loop, Either};
 
 use ::{command, Connection, BoxedCmd};
@@ -14,8 +14,8 @@ macro_rules! smtp_chain {
     });
 }
 
-pub trait HandleErrorInChain: 'static {
-    type Fut: Future<Item=(Connection, bool), Error=std_io::Error>;
+pub trait HandleErrorInChain: Send + Sync + 'static {
+    type Fut: Future<Item=(Connection, bool), Error=std_io::Error> + Send;
 
     fn handle_error(&self, con: Connection, msg_idx: usize, logic_error: &LogicError) -> Self::Fut;
 }
@@ -23,10 +23,10 @@ pub trait HandleErrorInChain: 'static {
 
 //FIXME[rust/impl Trait in struct]: use impl Trait/abstract type
 pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
-    -> Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error>>
+    -> Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error> + Send>
     where H: HandleErrorInChain
 {
-    let _on_error = Rc::new(on_error);
+    let _on_error = Arc::new(on_error);
     let mut chain = chain;
     //stackify
     chain.reverse();
@@ -78,7 +78,7 @@ pub enum OnError {
 
 impl HandleErrorInChain for OnError {
     //FIXME[rust/impl Trait for associated type]: use impl Trait/abstract type
-    type Fut = Box<Future<Item=(Connection, bool), Error=std_io::Error>>;
+    type Fut = Box<Future<Item=(Connection, bool), Error=std_io::Error> + Send>;
 
     fn handle_error(&self, con: Connection, _msg_idx: usize, _error: &LogicError) -> Self::Fut {
         let fut = match *self {

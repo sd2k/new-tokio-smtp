@@ -39,6 +39,14 @@ impl Display for ConnectingFailed {
     }
 }
 
+pub fn check_response(response: Response) -> Result<Response, LogicError> {
+    if response.is_erroneous() {
+        Err(LogicError::Code(response))
+    } else {
+        Ok(response)
+    }
+}
+
 #[derive(Debug)]
 pub enum LogicError {
     /// The server replied with a error response code
@@ -55,16 +63,18 @@ pub enum LogicError {
     /// This is meant to be produced by a custom command, as the sender of the command knows
     /// (at some abstraction level) which command it send, it can downcast and handle the
     /// error
-    Custom(Box<Error + 'static + Send + Sync>)
+    Custom(Box<Error + 'static + Send + Sync>),
+
+    /// command can not be used, as the server does not promotes the necessary capabilities
+    MissingCapabilities(MissingCapabilities)
 }
 
-pub fn check_response(response: Response) -> Result<Response, LogicError> {
-    if response.is_erroneous() {
-        Err(LogicError::Code(response))
-    } else {
-        Ok(response)
+impl From<MissingCapabilities> for LogicError {
+    fn from(err: MissingCapabilities) -> Self {
+        LogicError::MissingCapabilities(err)
     }
 }
+
 
 
 impl Error for LogicError {
@@ -74,6 +84,7 @@ impl Error for LogicError {
         match *self {
             Code(_) => "server responded with error response code",
             UnexpectedCode(_) => "server responded with unexpected non-error response code",
+            MissingCapabilities(ref err) => err.description(),
             Custom(ref boxed) => boxed.description()
         }
     }
