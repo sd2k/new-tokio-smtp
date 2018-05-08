@@ -162,6 +162,13 @@ pub struct MailAddress {
 
 impl MailAddress {
 
+    pub fn new_unchecked(raw_email: String, needs_smtputf8: bool) -> Self {
+        MailAddress {
+            raw: raw_email,
+            needs_smtputf8
+        }
+    }
+
     pub fn from_str_unchecked<I>(raw: I) -> Self
         where I: Into<String> + AsRef<str>
     {
