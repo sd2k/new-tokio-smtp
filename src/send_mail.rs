@@ -1,4 +1,3 @@
-
 /*
 
 Requirements:
@@ -93,7 +92,7 @@ impl Mail {
 }
 
 //POD
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EnvelopData {
     pub from: Option<MailAddress>,
     pub to: Vec1<MailAddress>,
@@ -154,7 +153,7 @@ impl From<MailEnvelop> for (Mail, EnvelopData) {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MailAddress {
     //FIXME[dep/good mail address crate]: use that
     raw: String,
@@ -191,12 +190,14 @@ impl From<MailAddress> for ForwardPath {
     }
 }
 
+pub type MailSendResult = Result<(), (usize, LogicError)>;
+
 pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     //TODO better error
     -> Result<
-        Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error>>,
+        Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error>>,
         (Connection, MissingCapabilities)>
-    where H: HandleErrorInChain + 'static
+    where H: HandleErrorInChain
 {
     let use_smtputf8 =  envelop.needs_smtputf8();
     let (mail, EnvelopData { from, to: tos }) = envelop.into();

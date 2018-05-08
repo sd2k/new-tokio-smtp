@@ -14,7 +14,7 @@ macro_rules! smtp_chain {
     });
 }
 
-pub trait HandleErrorInChain {
+pub trait HandleErrorInChain: 'static {
     type Fut: Future<Item=(Connection, bool), Error=std_io::Error>;
 
     fn handle_error(&self, con: Connection, msg_idx: usize, logic_error: &LogicError) -> Self::Fut;
@@ -24,7 +24,7 @@ pub trait HandleErrorInChain {
 //FIXME[rust/impl Trait in struct]: use impl Trait/abstract type
 pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
     -> Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error>>
-    where H: HandleErrorInChain + 'static
+    where H: HandleErrorInChain
 {
     let _on_error = Rc::new(on_error);
     let mut chain = chain;
