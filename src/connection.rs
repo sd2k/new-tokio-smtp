@@ -1,23 +1,14 @@
 use std::{io as std_io};
-use std::net::SocketAddr;
 
 use futures::future::{self, Future};
 use tokio::io::{shutdown, Shutdown};
 
-use ::future_ext::ResultWithContextExt;
-use ::common::{
-    EhloData,
-    ConnectionConfig,
-    ClientIdentity,
-    Security,
-    TlsConfig,
-    SetupTls
-};
+use ::common::EhloData;
 use ::error::MissingCapabilities;
 use ::io::{Io, SmtpResult, Socket};
 
 
-pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error>>;
+pub type CmdFuture = Box<Future<Item=(Connection, SmtpResult), Error=std_io::Error> + Send + 'static>;
 
 #[derive(Debug)]
 pub struct Connection {
@@ -26,114 +17,6 @@ pub struct Connection {
 
 
 impl Connection {
-
-    pub fn connect<S>(config: ConnectionConfig<S>) -> CmdFuture
-        where S: SetupTls
-    {
-        let ConnectionConfig { addr, security, client_id } = config;
-        match security {
-            Security::None => {
-                Connection::connect_insecure(&addr, client_id)
-            },
-            Security::DirectTls(tls_config) => {
-                Connection::connect_direct_tls(&addr, client_id, tls_config)
-            }
-            Security::StartTls(tls_config) => {
-                Connection::connect_starttls(&addr, client_id, tls_config)
-            }
-        }
-    }
-
-    //TODO[rust/impl Trait]: remove boxing
-    pub fn connect_insecure_no_ehlo(addr: &SocketAddr) -> CmdFuture {
-        let fut = Io
-        ::connect_insecure(addr)
-            .and_then(Io::parse_response)
-            .map(|(io, response)| (Connection::from(io), response));
-
-        Box::new(fut)
-    }
-
-    //TODO[rust/impl Trait]: remove boxing
-    pub fn connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, config: TlsConfig<S>) -> CmdFuture
-        where S: SetupTls
-    {
-        let fut = Io
-        ::connect_secure(addr, config)
-            .and_then(Io::parse_response)
-            .map(|(io, response)| (Connection::from(io), response));
-
-        Box::new(fut)
-    }
-
-    pub fn connect_insecure(addr: &SocketAddr, clid: ClientIdentity) -> CmdFuture {
-        //Note: this has a circular dependency between Connection <-> cmd Ehlo which
-        // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::Ehlo;
-        let fut = Connection
-        ::connect_insecure_no_ehlo(addr)
-            .ctx_and_then(move |con, _| {
-                con.send(Ehlo::from(clid))
-            });
-
-
-        Box::new(fut)
-    }
-
-    pub fn connect_direct_tls<S>(
-        addr: &SocketAddr,
-        clid: ClientIdentity,
-        config: TlsConfig<S>,
-    ) -> CmdFuture
-        where S: SetupTls
-    {
-        //Note: this has a circular dependency between Connection <-> cmd Ehlo which
-        // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::Ehlo;
-        let fut = Connection
-        ::connect_direct_tls_no_ehlo(addr, config)
-            .ctx_and_then(move |con, _| {
-                con.send(Ehlo::from(clid))
-            });
-
-        Box::new(fut)
-    }
-
-    pub fn connect_starttls<S>(
-        addr: &SocketAddr,
-        clid: ClientIdentity,
-        config: TlsConfig<S>
-    )
-        -> CmdFuture
-        where S: SetupTls
-    {
-        //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
-        // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::{StartTls, Ehlo};
-        let TlsConfig { domain, setup } = config;
-
-        let fut = Connection
-        ::connect_insecure(&addr, clid.clone())
-            .ctx_and_then(|con, _| {
-                if !con.has_capability("STARTTLS") {
-                    let fut = future::err(std_io::Error::new(
-                        std_io::ErrorKind::Other,
-                        "server does not support STARTTLS"
-                    ));
-                    Box::new(fut)
-                } else {
-                    con.send(StartTls {
-                        setup_tls: setup,
-                        sni_domain: domain
-                    })
-                }
-            })
-            .ctx_and_then(|con, _| {
-                con.send(Ehlo::from(clid))
-            });
-
-        Box::new(fut)
-    }
 
     pub fn send<C: Cmd>(self, cmd: C) -> CmdFuture {
         cmd.exec(self)
@@ -219,7 +102,7 @@ impl From<Socket> for Connection {
 
 
 
-pub trait Cmd {
+pub trait Cmd: 'static {
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>;
 

@@ -12,7 +12,7 @@ pub enum Socket {
     Secure(TlsStream<TcpStream>),
     Insecure(TcpStream),
     #[cfg(feature="mock_support")]
-    Mock(Box<MockStream>)
+    Mock(Box<MockStream + Send>)
 }
 
 impl Socket {

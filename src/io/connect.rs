@@ -23,7 +23,7 @@ impl Io {
 
     //FIXME[rust/impl Trait]: use -> impl Future<Item=Io, Error=std_io::Error>
     pub fn connect_secure<S>(addr: &SocketAddr, config: TlsConfig<S>)
-        -> Box<Future<Item=Io, Error=std_io::Error> + 'static>
+        -> Box<Future<Item=Io, Error=std_io::Error> + Send + 'static>
         where S: SetupTls
     {
         let TlsConfig { domain, setup } = config;

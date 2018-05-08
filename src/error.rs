@@ -1,7 +1,43 @@
+use std::{io as std_io};
 use std::error::Error;
 use std::fmt::{self, Display, Debug};
 use ::data_types::{Capability, EsmtpKeyword};
 use ::response::Response;
+
+#[derive(Debug)]
+pub enum ConnectingFailed {
+    Io(std_io::Error),
+    Setup(LogicError),
+    Auth(LogicError)
+}
+
+impl From<std_io::Error> for ConnectingFailed {
+    fn from(err: std_io::Error) -> Self {
+        ConnectingFailed::Io(err)
+    }
+}
+
+impl Error for ConnectingFailed {
+    fn description(&self) -> &str {
+       "connecting with server failed"
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        use self::ConnectingFailed::*;
+        match *self {
+            Io(ref err) => Some(err),
+            Setup(ref err) => Some(err),
+            Auth(ref err) => Some(err)
+        }
+    }
+}
+
+impl Display for ConnectingFailed {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        //TODO better implementation
+        Debug::fmt(self, fter)
+    }
+}
 
 #[derive(Debug)]
 pub enum LogicError {

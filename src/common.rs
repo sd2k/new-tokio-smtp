@@ -1,5 +1,5 @@
 use std::io as std_io;
-use std::net::{SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt::Debug;
 use std::collections::HashMap;
 use native_tls::{self, TlsConnectorBuilder, TlsConnector};
@@ -61,46 +61,8 @@ impl From<Domain> for TlsConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Security<S>
-    where S: SetupTls
-{
-    None,
-    DirectTls(TlsConfig<S>),
-    StartTls(TlsConfig<S>)
-}
 
-#[derive(Debug, Clone)]
-pub struct ConnectionConfig<S = DefaultTlsSetup>
-    where S: SetupTls
-{
-    pub addr: SocketAddr,
-    pub security: Security<S>,
-    pub client_id: ClientIdentity
-}
-
-impl ConnectionConfig<DefaultTlsSetup> {
-
-    pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientIdentity) -> Self {
-        ConnectionConfig {
-            addr,
-            security: Security::DirectTls(domain.into()),
-            client_id: clid
-        }
-    }
-
-    pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientIdentity) -> Self {
-        ConnectionConfig {
-            addr,
-            security: Security::StartTls(domain.into()),
-            client_id: clid
-        }
-    }
-}
-
-
-
-pub trait SetupTls: Debug + 'static {
+pub trait SetupTls: Debug + Send + 'static {
     fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>;
 }
 
@@ -114,7 +76,7 @@ impl SetupTls for DefaultTlsSetup {
 }
 
 impl<F: 'static> SetupTls for F
-    where F: Debug + FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
+    where F: Send + Debug + FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
 {
     fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
         (self)(builder)

@@ -21,6 +21,7 @@ pub mod response;
 pub mod error;
 pub mod io;
 mod connection;
+mod connect;
 pub mod command;
 pub mod chain;
 #[cfg(feature="mock_impl")]
@@ -33,5 +34,6 @@ pub use self::common::*;
 pub use self::response::Response;
 pub use self::io::Io;
 pub use self::connection::*;
+pub use self::connect::*;
 
 

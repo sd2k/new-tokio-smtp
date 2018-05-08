@@ -5,6 +5,10 @@ use ::common::EhloData;
 use ::error::MissingCapabilities;
 use ::{Connection, CmdFuture, Cmd};
 
+/// Quit command, but as it makes the connection unusable we do
+/// not publicly provide it for usage with `Connection::send`,
+/// instead using `Connection::quit` is recommended.
+#[doc(hidden)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Quit;
 
