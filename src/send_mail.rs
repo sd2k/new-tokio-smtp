@@ -98,6 +98,14 @@ pub struct EnvelopData {
     pub to: Vec1<MailAddress>,
 }
 
+impl EnvelopData {
+
+    pub fn needs_smtputf8(&self) -> bool {
+        self.from.as_ref().map(|f| f.needs_smtputf8()).unwrap_or(false)
+            || self.to.iter().any(|to| to.needs_smtputf8())
+    }
+}
+
 #[derive(Debug)]
 pub struct MailEnvelop {
     envelop_data: EnvelopData,
@@ -133,9 +141,7 @@ impl MailEnvelop {
     }
 
     pub fn needs_smtputf8(&self) -> bool {
-        self.envelop_data.from.as_ref().map(|f| f.needs_smtputf8()).unwrap_or(false)
-            || self.envelop_data.to.iter().any(|to| to.needs_smtputf8())
-            || self.mail.needs_smtputf8()
+        self.envelop_data.needs_smtputf8() || self.mail.needs_smtputf8()
     }
 
 }
