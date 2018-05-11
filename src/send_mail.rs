@@ -189,6 +189,10 @@ impl MailAddress {
     pub fn needs_smtputf8(&self) -> bool {
         self.needs_smtputf8
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.raw
+    }
 }
 
 impl From<MailAddress> for ReversePath {
