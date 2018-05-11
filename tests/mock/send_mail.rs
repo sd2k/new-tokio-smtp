@@ -3,7 +3,6 @@ use futures::Future;
 use new_tokio_smtp::send_mail::{
     Mail, MailAddress, MailEnvelop,
     EncodingRequirement,
-    ConSendMailExt
 };
 use new_tokio_smtp::mock::{ ActionData, Actor};
 

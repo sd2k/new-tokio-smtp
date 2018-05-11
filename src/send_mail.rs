@@ -48,7 +48,7 @@ Temporary Solution:
 */
 use std::{io as std_io};
 
-use futures::future::{self, Either, Future, FutureResult};
+use futures::future::{self, Either, Future};
 use vec1::Vec1;
 
 use ::{Cmd, Connection};
@@ -212,7 +212,7 @@ pub type MailSendFuture = Box<Future<Item=(Connection, MailSendResult), Error=st
 
 pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     //TODO better error
-    -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>
+    -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
     where H: HandleErrorInChain
 {
     let use_smtputf8 =  envelop.needs_smtputf8();
@@ -253,16 +253,10 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     Either::A(chain(con, cmd_chain, on_error))
 }
 
-
-pub trait ConSendMailExt {
-
-    fn send_mail(self, envelop: MailEnvelop)
-        -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>;
-}
-
-impl ConSendMailExt for Connection {
-    fn send_mail(self, envelop: MailEnvelop)
-        -> Either<MailSendFuture, FutureResult<(Connection, MailSendResult), std_io::Error>>
+//TODO[rust/impl Trait extended] turn this into an extension trait, when viable
+impl Connection {
+    pub fn send_mail(self, envelop: MailEnvelop)
+        -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
     {
         send_mail(self, envelop, OnError::StopAndReset)
     }

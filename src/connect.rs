@@ -19,11 +19,10 @@ use ::connection::{
 
 pub type ConnectingFuture = Box<Future<Item=Connection, Error=ConnectingFailed> + Send + 'static>;
 
-//TODO[rust/impl Trait]
 fn cmd_future2connecting_future<LE: 'static, E>(
     res: Result<(Connection, SmtpResult), E>,
     new_logic_err: LE
-) -> ConnectingFuture
+) -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
     where LE: Send + FnOnce(LogicError) -> ConnectingFailed,
           E: Into<ConnectingFailed>
 {
@@ -36,23 +35,25 @@ fn cmd_future2connecting_future<LE: 'static, E>(
             }
         };
 
-    Box::new(fut)
+    fut
 }
 
 impl Connection {
-    pub fn connect<S, A>(config: ConnectionConfig<A, S>) -> ConnectingFuture
+    pub fn connect<S, A>(config: ConnectionConfig<A, S>)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls, A: Cmd + Send
     {
         let ConnectionConfig { addr, security, client_id, auth_cmd } = config;
         let con_fut = match security {
             Security::None => {
-                Connection::_connect_insecure(&addr, client_id)
+                //TODO use Treither??
+                Either::B(Either::A(Connection::_connect_insecure(&addr, client_id)))
             },
             Security::DirectTls(tls_config) => {
-                Connection::_connect_direct_tls(&addr, client_id, tls_config)
+                Either::B(Either::B(Connection::_connect_direct_tls(&addr, client_id, tls_config)))
             }
             Security::StartTls(tls_config) => {
-                Connection::_connect_starttls(&addr, client_id, tls_config)
+                Either::A(Connection::_connect_starttls(&addr, client_id, tls_config))
             }
         };
 
@@ -62,11 +63,12 @@ impl Connection {
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
             );
 
-        Box::new(fut)
+        fut
     }
 
-    //TODO[rust/impl Trait]: remove boxing
-    pub fn _connect_insecure_no_ehlo(addr: &SocketAddr) -> ConnectingFuture {
+    pub fn _connect_insecure_no_ehlo(addr: &SocketAddr)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
+    {
         let fut = Io
             ::connect_insecure(addr)
             .and_then(Io::parse_response)
@@ -75,11 +77,11 @@ impl Connection {
                 cmd_future2connecting_future(res, ConnectingFailed::Setup)
             });
 
-        Box::new(fut)
+        fut
     }
 
-    //TODO[rust/impl Trait]: remove boxing
-    pub fn _connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, config: TlsConfig<S>) -> ConnectingFuture
+    pub fn _connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, config: TlsConfig<S>)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls
     {
         let fut = Io
@@ -90,10 +92,12 @@ impl Connection {
                 cmd_future2connecting_future(res, ConnectingFailed::Setup)
             });
 
-        Box::new(fut)
+        fut
     }
 
-    pub fn _connect_insecure(addr: &SocketAddr, clid: ClientIdentity) -> ConnectingFuture {
+    pub fn _connect_insecure(addr: &SocketAddr, clid: ClientIdentity)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
+    {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
@@ -105,14 +109,14 @@ impl Connection {
             );
 
 
-        Box::new(fut)
+        fut
     }
 
     pub fn _connect_direct_tls<S>(
         addr: &SocketAddr,
         clid: ClientIdentity,
         config: TlsConfig<S>,
-    ) -> ConnectingFuture
+    ) -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls
     {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
@@ -125,7 +129,7 @@ impl Connection {
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
             );
 
-        Box::new(fut)
+        fut
     }
 
     pub fn _connect_starttls<S>(
@@ -133,7 +137,7 @@ impl Connection {
         clid: ClientIdentity,
         config: TlsConfig<S>
     )
-        -> ConnectingFuture
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls
     {
         //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
@@ -156,7 +160,7 @@ impl Connection {
             )
             .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup));
 
-        Box::new(fut)
+        fut
     }
 }
 

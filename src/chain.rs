@@ -21,9 +21,8 @@ pub trait HandleErrorInChain: Send + Sync + 'static {
 }
 
 
-//FIXME[rust/impl Trait in struct]: use impl Trait/abstract type
 pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
-    -> Box<Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error> + Send>
+    -> impl Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error> + Send
     where H: HandleErrorInChain
 {
     let _on_error = Arc::new(on_error);
@@ -66,7 +65,7 @@ pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
             }
         });
 
-    Box::new(fut)
+    fut
 }
 
 
@@ -79,6 +78,7 @@ pub enum OnError {
 impl HandleErrorInChain for OnError {
     //FIXME[rust/impl Trait for associated type]: use impl Trait/abstract type
     type Fut = Box<Future<Item=(Connection, bool), Error=std_io::Error> + Send>;
+    //type Fut = impl Future<Item=(Connection, bool), Error=std_io::Error> + Send;
 
     fn handle_error(&self, con: Connection, _msg_idx: usize, _error: &LogicError) -> Self::Fut {
         let fut = match *self {

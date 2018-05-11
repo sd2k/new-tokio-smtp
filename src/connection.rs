@@ -71,14 +71,8 @@ impl Connection {
         shutdown(socket)
     }
 
-    //TODO[rust/impl Trait]: remove boxing
     /// sends Quit to the server and then shuts down the socket
-    pub fn quit(self)
-        -> future::AndThen<
-            Either<CmdFuture, FutureResult<CmdFutureItem, CmdFutureError>>,
-            Shutdown<Socket>,
-            fn((Connection, SmtpResult)) -> Shutdown<Socket>>
-    {
+    pub fn quit(self) -> impl Future<Item=Socket, Error=std_io::Error> {
         //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Quit;

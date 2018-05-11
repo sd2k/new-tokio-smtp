@@ -1,7 +1,7 @@
 use std::{io as std_io};
 use std::net::SocketAddr;
 
-use futures::future::{self, Map, Future};
+use futures::future::{self, Map, Either, Future};
 use tokio::net::{TcpStream, ConnectFuture};
 use tokio_tls::TlsConnectorExt;
 use native_tls::TlsConnector;
@@ -21,9 +21,8 @@ impl Io {
         fut
     }
 
-    //FIXME[rust/impl Trait]: use -> impl Future<Item=Io, Error=std_io::Error>
     pub fn connect_secure<S>(addr: &SocketAddr, config: TlsConfig<S>)
-        -> Box<Future<Item=Io, Error=std_io::Error> + Send + 'static>
+        -> impl Future<Item=Io, Error=std_io::Error> + Send
         where S: SetupTls
     {
         let TlsConfig { domain, setup } = config;
@@ -31,7 +30,7 @@ impl Io {
             {
                 setup.setup(TlsConnector::builder()?)
             } =>
-            |err| Box::new(future::err(map_tls_err(err)))
+            |err| Either::B(future::err(map_tls_err(err)))
         );
 
         let fut = TcpStream
@@ -42,8 +41,7 @@ impl Io {
             )
             .map(Io::from);
 
-        Box::new(fut)
-
+        Either::A(fut)
     }
 
 }
