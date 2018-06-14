@@ -7,13 +7,13 @@
 //!
 //! # Example
 //!
-//! (example not yet complete in sync with code)
-//! ```ignore
+//! ```no_run
 //! # extern crate futures;
 //! # #[macro_use] extern crate new_tokio_smtp;
 //! # #[macro_use] extern crate vec1;
 //! # use new_tokio_smtp::command;
 //! use futures::future::{self, lazy, Future};
+//! use new_tokio_smtp::error::GeneralError;
 //! use new_tokio_smtp::{Connection, ConnectionConfig};
 //! use new_tokio_smtp::send_mail::{
 //!     Mail, EncodingRequirement,
@@ -38,17 +38,48 @@
 //! let send_to = MailAddress::from_str_unchecked("test@receiver.test");
 //! let mail = MailEnvelop::new(sender, vec1![ send_to ], mail_data);
 //!
+//! let mail2 = mail.clone();
+//! let config2 = config.clone();
+//!
 //! mock_run_with_tokio(lazy(move || {
 //!     Connection::connect(config)
-//!         .and_then(|con| con.send_mail(mail))
+//!         .map_err(GeneralError::from)
+//!         .and_then(|con| con.send_mail(mail).map_err(Into::into))
 //!         .and_then(|(con, mail_result)| {
 //!             if let Err((idx, err)) = mail_result {
-//!                 println!("sending mail failed: {}", err);
+//!                 println!("sending mail failed: {}", err)
 //!             }
-//!             con.quit()
+//!             con.quit().map_err(Into::into)
+//!         }).then(|res|{
+//!             match res {
+//!                 Ok(_) => println!("done, and closed connection"),
+//!                 Err(err) => println!("problem with connection: {}", err)
+//!             }
+//!             Result::Ok::<(),()>(())
 //!         })
 //! }));
 //!
+//! //or simpler (but with more verbose output)
+//! mock_run_with_tokio(lazy(move || {
+//!     Connection::connect_send_quit(config2, vec![ mail2 ])
+//!         .then(|result| {
+//!             let results = match result {
+//!                 Ok(results) => results,
+//!                 Err((con, mails, results)) => {
+//!                     println!("{} mails where not send due too: {}", mails.len(), con);
+//!                     results
+//!                 }
+//!             };
+//!             for (idx, result) in results.iter().enumerate() {
+//!                 if let Err((_, err)) = result {
+//!                     println!("mail nr {} failed to be send: {}", idx, err)
+//!                 } else {
+//!                     println!("mail nr {} was send", idx)
+//!                 }
+//!             }
+//!             Result::Ok::<(),()>(())
+//!         })
+//! }));
 //!
 //! # // some mock-up, for this example to compile
 //! # fn mock_connection_config() -> ConnectionConfig<command::AuthPlain>
@@ -58,14 +89,15 @@
 //!
 use std::{io as std_io};
 
-use futures::future::{self, Either, Future};
+use futures::future::{self, Either, Future, Loop};
 use vec1::Vec1;
 
 use ::{Cmd, Connection};
-use ::error::{LogicError, MissingCapabilities};
+use ::error::{LogicError, MissingCapabilities, GeneralError};
 use ::chain::{chain, OnError, HandleErrorInChain};
 use ::data_types::{ReversePath, ForwardPath};
 use ::command::{self, params_with_smtputf8};
+use ::connect::ConnectionConfig;
 
 /// Specifies if the mail requires SMTPUTF8 (or Mime8bit)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -76,7 +108,7 @@ pub enum EncodingRequirement {
 }
 
 /// A simplified representation of a mail consisting of an `EncodingRequirement` and a buffer
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mail {
     encoding_requirement: EncodingRequirement,
     mail: Vec<u8>
@@ -126,7 +158,7 @@ impl EnvelopData {
 }
 
 /// represents a mail envelop consisting of `EnvelopData` and a `Mail`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MailEnvelop {
     envelop_data: EnvelopData,
     mail: Mail
@@ -312,6 +344,7 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     Either::A(chain(con, cmd_chain, on_error))
 }
 
+
 impl Connection {
 
     /// Sends a mail specified through `MailEnvelop` through this connection.
@@ -325,5 +358,63 @@ impl Connection {
         -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
     {
         send_mail(self, envelop, OnError::StopAndReset)
+    }
+
+    //FIXME put on_error back in
+    /// creates a new connection, sends all mails and then closes the connection
+    ///
+    /// This will try to send all mails, if sending a mail fails because of `LogicError`
+    /// it will still try to send the other mails. If sending a mail fails because
+    /// of an I/O-Error causing the connection to be lost the not send mails are
+    /// returned. Through currently the mail which caused the failure will be lost
+    /// (which is bad as it's more likely the environment which caused the failure)
+    ///
+    /// Take a look at the `send_mail` module documentation for an usage example.
+    pub fn connect_send_quit<A>(
+        config: ConnectionConfig<A>,
+        mails: Vec<MailEnvelop>,
+    ) -> impl Future<
+        Item=Vec<MailSendResult>,
+        Error=(GeneralError, Vec<MailEnvelop>, Vec<MailSendResult>)
+    > + Send
+        where A: Cmd
+    {
+        //stackify
+        let mut mails = mails;
+        mails.reverse();
+
+        let mresults: Vec<MailSendResult> = Vec::new();
+
+        let fut = Connection::connect(config)
+            .then(|result| match result {
+                Err(err) => Err((GeneralError::from(err), mails, mresults)),
+                Ok(con) => Ok((con, mails, mresults))
+            })
+            .and_then(move |(con, mails, mresults)| future::loop_fn((con, mails, mresults),
+                |(con, mut mails, mut mresults)| {
+                    if let Some(mail) = mails.pop() {
+                        let fut = con
+                            .send_mail(mail)
+                            .then(|result| match result {
+                                Ok((con, mail_send_result)) => {
+                                    mresults.push(mail_send_result);
+                                    Ok(Loop::Continue((con, mails, mresults)))
+                                },
+                                Err(io_error) => {
+                                    Err((GeneralError::from(io_error), mails, mresults))
+                                }
+                            });
+
+                        Either::A(fut)
+                    } else {
+                        Either::B(future::ok(Loop::Break((con, mresults))))
+                    }
+                }
+            ))
+            .and_then(|(con, results)| {
+                con.quit().then(|_| Ok(results))
+            });
+
+        fut
     }
 }

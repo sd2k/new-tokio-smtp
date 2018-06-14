@@ -5,6 +5,42 @@ use std::fmt::{self, Display, Debug};
 use ::data_types::{Capability, EsmtpKeyword};
 use ::response::Response;
 
+#[derive(Debug)]
+pub enum GeneralError {
+    Connecting(ConnectingFailed),
+    Cmd(LogicError),
+    Connection(std_io::Error)
+}
+
+impl Display for GeneralError {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        use self::GeneralError::*;
+        match *self {
+            Connecting(ref err) => write!(fter, "Connecting failed: {}", err),
+            Cmd(ref err) => write!(fter, "A command failed: {}", err),
+            Connection(ref err) => write!(fter, "Connection failed after connecting successfully: {}", err)
+        }
+    }
+}
+
+impl From<std_io::Error> for GeneralError {
+    fn from(err: std_io::Error) -> Self {
+        GeneralError::Connection(err)
+    }
+}
+
+impl From<ConnectingFailed> for GeneralError {
+    fn from(err: ConnectingFailed) -> Self {
+        GeneralError::Connecting(err)
+    }
+}
+
+impl From<LogicError> for GeneralError {
+    fn from(err: LogicError) -> Self {
+        GeneralError::Cmd(err)
+    }
+}
+
 /// error representing that creating a connection failed
 #[derive(Debug)]
 pub enum ConnectingFailed {
