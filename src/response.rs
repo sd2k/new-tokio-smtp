@@ -1,4 +1,5 @@
 
+/// response of a smtp server
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Response {
     code: ResponseCode,
@@ -18,45 +19,57 @@ impl Response {
         Response { code, lines }
     }
 
+    /// true if the response code is unknown or indicates an error
     pub fn is_erroneous(&self) -> bool {
         self.code.is_erroneous()
     }
 
+    /// return the response code
     pub fn code(&self) -> ResponseCode {
         self.code
     }
 
+    /// returns the lines of the msg/payload
+    ///
+    /// this will have at last one line, throuhg
+    /// this line might be empty
     pub fn msg(&self) -> &[String] {
         &self.lines
     }
 }
 
-
+/// the response code of used by smtp server
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ResponseCode([u8; 3]);
 
 impl ResponseCode {
 
+    /// true if the code starts with `2`
     pub fn is_positive(&self) -> bool {
         self.0[0] == b'2'
     }
 
+    /// true if the code starts with `3`
     pub fn is_intermediate(&self) -> bool {
         self.0[0] == b'3'
     }
 
+    /// true if the code starts with `4`
     pub fn is_transient_failure(&self) -> bool {
         self.0[0] == b'4'
     }
 
+    /// true if the code starts with `5`
     pub fn is_permanent_failure(&self) -> bool {
         self.0[0] == b'5'
     }
 
+    /// true if the code doesn't start with `2` or `3`
     pub fn is_erroneous(&self) -> bool {
         !self.is_positive() && !self.is_intermediate()
     }
 
+    /// the actual bytes returned as response code
     pub fn as_byte_string(&self) -> [u8; 3] {
         self.0
     }
