@@ -7,6 +7,8 @@ use super::Io;
 
 
 impl Io {
+
+    /// return a futures resolving back to this instance once all output data is flushed
     pub fn flush(self) -> Flushing {
         Flushing::new(self)
     }
@@ -17,6 +19,10 @@ impl Io {
         self.flush()
     }
 
+    /// writes data from the output buffer to the socket and polls flush
+    ///
+    /// This first poll the writing of data from output to socket until
+    /// output is empty, then it will start polling flush on the socket.
     pub fn poll_flush(&mut self) -> Poll<(), std_io::Error> {
         let output = &mut self.buffer.output;
         let socket = &mut self.socket;

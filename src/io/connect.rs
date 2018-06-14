@@ -12,6 +12,7 @@ use super::Io;
 
 impl Io {
 
+    /// create a new Tcp only connection to the given address
     //FIXME[rust/impl Trait]: use -> impl Future<Item=Io, Error=std_io::Error>
     pub fn connect_insecure(addr: &SocketAddr) -> Map<ConnectFuture, fn(TcpStream) -> Io> {
         let fut = TcpStream
@@ -21,6 +22,7 @@ impl Io {
         fut
     }
 
+    /// create a new Tcp-Tls connection to the given address using the given tls config
     pub fn connect_secure<S>(addr: &SocketAddr, config: TlsConfig<S>)
         -> impl Future<Item=Io, Error=std_io::Error> + Send
         where S: SetupTls

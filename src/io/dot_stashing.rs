@@ -7,6 +7,13 @@ use bytes::buf::{Buf, BufMut};
 use super::{Io, OUTPUT_BUFFER_INC_SIZE};
 
 impl Io {
+
+    /// write all data from source to the output socket using dot-stashing
+    ///
+    /// This includes the end of message sequence "\r\n.\r\n", through this
+    /// implementation makes sure not to add a additional "\r\n" to the end
+    /// of the file if it isn't needed.
+    ///
     pub fn write_dot_stashed<S>(self, source: S) -> DotStashedWrite<S>
         where S: Stream<Error=std_io::Error>, S::Item: Buf
     {
@@ -28,6 +35,7 @@ pub struct DotStashedWrite<S>
     io: Option<Io>,
     source: S,
     stash_state: CrLf,
+    /// end of mail sequence i.e. "\r\n.\r\n"
     write_eom_seq: bool
 }
 

@@ -7,6 +7,17 @@ use tokio::net::TcpStream;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tls::TlsStream;
 
+/// Abstraction over Tcp, TcpTls (and Mock)
+///
+/// Allows treating both `TcpStream` and
+/// `TlsStream<TcpStream>` the same.
+///
+/// # Features
+/// ## `mock_support`
+///
+/// if enabled this abstracts not only over `TcpStream` and
+/// `TlsStream<TcpStream` but also `Box<MockStream+Send>`
+///
 #[derive(Debug)]
 pub enum Socket {
     Secure(TlsStream<TcpStream>),
@@ -17,6 +28,7 @@ pub enum Socket {
 
 impl Socket {
 
+    /// true if it's a `TlsStream` (or if mock says so)
     pub fn is_secure(&self) -> bool {
         match *self {
             Socket::Secure(_) => true,
@@ -116,6 +128,7 @@ impl AsyncWrite for Socket {
     }
 }
 
+/// trait representing a mock stream
 pub trait MockStream: Debug + AsyncRead + AsyncWrite + 'static {
     fn is_secure(&self) -> bool {
         false

@@ -11,6 +11,7 @@ use ::error::check_response;
 use super::{Io, SmtpResult, INPUT_BUFFER_INC_SIZE};
 
 impl Io {
+    /// parse a "normal" smtp response
     ///
     /// # Panics
     ///
@@ -75,7 +76,9 @@ impl Io {
 /// Used to hint if a socket was closed
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ReadState {
+    /// the socket was closed when reading from it
     SocketClosed,
+    /// the socket is not ready
     NotReady,
     // Buffer full is in between read and not ready, and super annoying to
     // handle (e.g. the edge case where the buffer is full and does not contain
@@ -90,12 +93,13 @@ pub enum ReadState {
 }
 
 impl ReadState {
+
     pub fn is_socket_closed(self) -> bool {
         self == ReadState::SocketClosed
     }
 }
 
-
+/// future returned by `Connection.parse_result`
 pub struct Parsing {
     inner: Option<Io>,
     lines: Vec<parser::ResponseLine>
