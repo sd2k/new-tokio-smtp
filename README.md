@@ -35,7 +35,7 @@ is provided through two mechanisms:
    higher level libraries are valid, e.g. it won't validate that the mail
    given to it is actually 7bit ascii or that it does not contain "orphan"
    `'\n'` (or `'\r'`) chars. But this is fine as this library is for using
-   smtp to send mails, but not for creating such mails. (Note that while
+   smtp to send mails, but _not_ for creating such mails. (Note that while
    it is trusting it does validate if a command can be used through checking
    the result from the last `EHLO` command, i.e. it wont allow you to send
    a `STARTTLS` command on a mail server not supporting it)
@@ -54,7 +54,6 @@ Concept
 The concept of behind the library is explained
 in the [notes/concept.md](./notes/concept.md) file.
 
-TODO short description
 
 Usability Helpers
 ------------------

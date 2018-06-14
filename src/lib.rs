@@ -1,3 +1,31 @@
+//! The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
+//! implementation using tokio.
+//!
+//! This crate provides _only_ SMTP functionality, this means it does neither
+//! provides functionality for creating mails, nor for e.g. retrying sending
+//! a mail if the receiver was temporary not available.
+//!
+//! This crate can be seen from two perspectives:
+//!
+//! 1. a normal API user, mainly bothering with `ConnectionConfig`, `Connection`
+//!    and `Cmd` implementations (in the `command` module)
+//!
+//! 2. a cmd implementation, having to use `Io`, `Socket` etc.
+//!
+//! # Features
+//!
+//! ## `send_mail`
+//!
+//! While still not handling the creation/encoding of mails if this feature is
+//! enabled a `send_mail` command is added `Connection` which combines the steps
+//! of sending the `MAIL` command, the `RCPT` command and the `DATA` command.
+//!
+//! ## `mock_support`, `mock_impl`
+//!
+//! Extend the `Socket` abstraction to include a mock socket additional to `Tcp`, `TcpTls`.
+//! Also provides a mock socket implementation for simply testing commands. Custom implementations
+//! can be provided too if needed for testing
+
 #[macro_use]
 extern crate futures;
 extern crate bytes;

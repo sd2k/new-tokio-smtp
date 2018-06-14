@@ -17,6 +17,7 @@ use ::connection::{
     Connection, Cmd,
 };
 
+/// A future resolving to an `Connection` instance
 pub type ConnectingFuture = Box<Future<Item=Connection, Error=ConnectingFailed> + Send + 'static>;
 
 fn cmd_future2connecting_future<LE: 'static, E>(
