@@ -1,4 +1,4 @@
-
+//! Provides access to `Response`, `ResponseCode` and parsing parts (form impl `Cmd`'s)
 /// response of a smtp server
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Response {
@@ -81,6 +81,7 @@ pub mod parser {
     use std::str::{self, Utf8Error};
     use std::fmt::{self, Display};
     use std::error::Error;
+
 
     #[derive(Debug, Clone)]
     pub enum ParseError {

@@ -7,8 +7,11 @@ use ::common::EhloData;
 use ::error::{LogicError, MissingCapabilities};
 use ::io::{Io, SmtpResult, Socket};
 
+/// the item the `CmdFuture` resolves to which is `(Connection, Result<Response, LogicError>)`
 pub type CmdFutureItem = (Connection, SmtpResult);
+/// gennerall error of sending a command
 pub type CmdFutureError = std_io::Error;
+/// future by `Cmd.exec` (and wrapped by `Connection.send`)
 pub type CmdFuture = Box<Future<Item=CmdFutureItem, Error=CmdFutureError> + Send + 'static>;
 
 /// The basic `Connection` type representing an (likely) open smtp connection
@@ -66,7 +69,7 @@ impl Connection {
     ///         }
     ///         con.send(command::Data::from_buf(concat!(
     ///             "Date: Thu, 14 Jun 2018 11:22:18 +0000\r\n",
-    ///             "From: <no-reply@test.test>\r\n",
+    ///             "From: Sendu <test@sender.test>\r\n",
     ///             "\r\n",
     ///             "...\r\n"
     ///         )))

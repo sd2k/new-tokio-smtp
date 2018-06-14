@@ -1,3 +1,4 @@
+//! provides a `MockStream` implementations
 use std::io::{self as std_io, Read, Write};
 use std::thread;
 use std::time::Duration;

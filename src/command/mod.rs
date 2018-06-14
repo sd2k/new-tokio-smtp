@@ -1,4 +1,4 @@
-
+//! Module containing all commands already provided by this crate
 mod ehlo;
 pub use self::ehlo::Ehlo;
 

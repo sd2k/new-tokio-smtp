@@ -1,3 +1,6 @@
+//! Provides the `smtp_chain` macro and the `chain` function
+//!
+//! see their respective documentation for more information.
 use std::io as std_io;
 use std::sync::Arc;
 use futures::future::{self, Future, Loop, Either};
@@ -5,7 +8,52 @@ use futures::future::{self, Future, Loop, Either};
 use ::{command, Connection, BoxedCmd};
 use ::error::LogicError;
 
-
+/// creates a chain of commands and them to the given connection
+///
+/// This will call `boxed()` on every command, while puting them
+/// into a vector which is then passed to `cain`.
+///
+/// # Example
+///
+/// ```no_run
+/// # extern crate futures;
+/// # #[macro_use] extern crate new_tokio_smtp;
+/// use futures::future::{self, Future};
+/// use new_tokio_smtp::chain::OnError;
+/// use new_tokio_smtp::{command, Connection, ReversePath, ForwardPath};
+///
+///
+/// let fut = future
+///     ::lazy(|| mock_create_connection())
+///     .and_then(|con| smtp_chain!(con with OnError::StopAndReset => [
+///         command::Mail::new(
+///             ReversePath::from_str_unchecked("test@sender.test")),
+///         command::Recipient::new(
+///             ForwardPath::from_str_unchecked("test@receiver.test")),
+///         command::Data::from_buf(concat!(
+///             "Date: Thu, 14 Jun 2018 11:22:18 +0000\r\n",
+///             "From: Sendu <test@sender.test>\r\n",
+///             "\r\n",
+///             "...\r\n"
+///         ))
+///     ]))
+///     .and_then(|(con, smtp_chain_result)| {
+///         if let Err((at_idx, err)) = smtp_chain_result {
+///             println!("server says no on the cmd with index {}: {}", at_idx, err)
+///         }
+///         con.quit()
+///     });
+///
+/// // ... this are tokio using operation make sure there is
+/// //     a running tokio instance/runtime/event loop
+/// mock_run_with_tokio(fut);
+///
+/// # // some mock-up, for this example to compile
+/// # fn mock_create_connection() -> Result<Connection, ::std::io::Error>
+/// #  { unimplemented!() }
+/// # fn mock_run_with_tokio(f: impl Future) { unimplemented!() }
+///
+/// ```
 #[macro_export]
 macro_rules! smtp_chain {
     ($con:ident with $oer:expr => [$($cmd:expr),*]) => ({

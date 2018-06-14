@@ -1,3 +1,4 @@
+//! error module
 use std::{io as std_io};
 use std::error::Error;
 use std::fmt::{self, Display, Debug};

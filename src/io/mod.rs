@@ -1,3 +1,5 @@
+//! This modules contains all the `Io` type related parts (for implementing `Cmd`)
+//!
 use bytes::BytesMut;
 use bytes::buf::BufMut;
 
@@ -31,6 +33,7 @@ const INPUT_BUFFER_INC_SIZE: usize = 256;
 // most commands should fit in 1024 bytes (except e.g. DATA/BDAT)
 const OUTPUT_BUFFER_INC_SIZE: usize = 1024;
 
+/// smtp result, either a `Response` or a `LogicError` potentially wrapping a `Response`
 pub type SmtpResult = Result<Response, LogicError>;
 
 /// A `Io` object representing a smtp connection with buffers, socket and ehlo data
