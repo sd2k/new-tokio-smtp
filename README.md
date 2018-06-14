@@ -1,9 +1,8 @@
-# new-tokio-smtp &emsp; [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![Build Status](https://travis-ci.org/1aim/new_tokio_smtp.svg?branch=master)](https://travis-ci.org/1aim/new_tokio_smtp)
+new-tokio-smtp [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![new-tokio-smtp](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+=====================
 
-**The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
-implementation using tokio.**
-
----
+The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
+implementation using tokio.
 
 This crate provides _only_ SMTP functionality, this means it does neither
 provides functionality for creating mails, nor for e.g. retrying sending
@@ -16,7 +15,7 @@ is provided through two mechanisms:
 1. SMTP commands are defined in a way which allow library user to
    define there own commands, all commands provided by this library
    could theoretically have been implemented in an external library,
-   this includes some of the more special commands like `STARTTLS`, 
+   this includes some of the more special commands like `STARTTLS`,
    `EHLO` and `DATA`. Moreover a `Connection` can be converted into
    a `Io` instance which provides a number of useful functionalities
    for easily implementing new commands, e.g. `Io.parse_response`.
@@ -44,18 +43,21 @@ is provided through two mechanisms:
 4. handling logic errors (i.e. server responded with code 550) separately
    from more fatal errors like e.g. a broken pipe
 
-## Example
+Example
+---------
 
 TODO impl example based on the _non-public_ smtp-send bin/carte
 
-## Concept
+Concept
+--------
 
 The concept of behind the library is explained
-in the [notes/concept.md](./notes/convept.md) file.
+in the [notes/concept.md](./notes/concept.md) file.
 
 TODO short description
 
-## Usability Helpers
+Usability Helpers
+------------------
 
 The library provides a number of usability helpers:
 
@@ -74,17 +76,18 @@ The library provides a number of usability helpers:
     A simple implementation for a `MockStream` which allows you
     to test which data was send to it and mock responses for it.
     (Through it's currently limited to a fixed predefined conversation,
-    if more is needed a custom `MockStream` impl. has to be used) 
+    if more is needed a custom `MockStream` impl. has to be used)
 
-4. `future_ext::ResultWithContextExt`: 
-    Provids a `ctx_and_then` and `ctx_or_else` methods making
+4. `future_ext::ResultWithContextExt`:
+    Provides a `ctx_and_then` and `ctx_or_else` methods making
     it easier to handle results resolving _as Item_ to an tuple
     of a context (here the connection) and a `Result` belonging
-    to an different abstraction level than the futures `Error` 
+    to an different abstraction level than the futures `Error`
     (here a possible `CommandError` while the future `Error` is
     an connection error like e.g. a broken pipe)
 
-## Limitations / TODOs
+Limitations / TODOs
+--------------------
 
 Like mentioned before this library has some limitations as it's
 meant to _only_ do SMTP and nothing more. Through there are
@@ -113,26 +116,29 @@ in future versions:
    for now not planed due to time limitations.
 
 5. no stable version (`v1.0`) for now, as `tokio` is not stable yet.
-   When tokio becomes stable a stable version should be released, 
+   When tokio becomes stable a stable version should be released,
    through another one might have to be released at some point if
    `PIPELINING` is implemented later one (through in the
    current concept for implementing it there are little
    braking changes, except for implementors of custom commands)
 
-## Documentation
+Documentation
+--------------
 
 Documentation can be [viewed on docs.rs](https://docs.rs/new-tokio-smtp).
 
-## License
+License
+--------
 
 Licensed under either of
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
-### Contribution
+Contribution
+-------------
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
