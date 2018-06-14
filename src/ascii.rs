@@ -2,6 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::borrow::{ToOwned, Borrow};
 use std::ops::Deref;
 
+/// A string which ignores ascii case when compared
 #[derive(Debug, Eq, Clone)]
 pub struct IgnoreAsciiCaseString {
     inner: String
@@ -68,7 +69,7 @@ impl Deref for IgnoreAsciiCaseString {
 }
 
 
-
+/// a `str` which uses ascii case when compared
 #[derive(Debug, Eq)]
 #[repr(C)]
 pub struct IgnoreAsciiCaseStr {
@@ -133,13 +134,13 @@ macro_rules! impl_eq {
                 self.as_str().eq_ignore_ascii_case(other.as_str())
             }
         }
-        
+
         impl PartialEq<String> for $name {
             fn eq(&self, other: &String) -> bool {
                 self.as_str().eq_ignore_ascii_case(other.as_str())
             }
         }
-        
+
         impl PartialEq<IgnoreAsciiCaseStr> for $name {
             fn eq(&self, other: &IgnoreAsciiCaseStr) -> bool {
                 self.as_str().eq_ignore_ascii_case(other.as_str())
@@ -151,13 +152,13 @@ macro_rules! impl_eq {
                 self.as_str().eq_ignore_ascii_case(other.as_str())
             }
         }
-        
+
         impl PartialEq<str> for $name {
             fn eq(&self, other: &str) -> bool {
                 self.as_str().eq_ignore_ascii_case(other)
             }
         }
-        
+
         impl<'a> PartialEq<&'a str> for $name {
             fn eq(&self, other: &&'a str) -> bool {
                 self.as_str().eq_ignore_ascii_case(*other)

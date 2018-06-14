@@ -14,13 +14,22 @@ macro_rules! smtp_chain {
     });
 }
 
+/// implement this trait for custom error in chain handling
+///
+/// e.g. a smtp allows failing some of the `RCPT` command in
+/// a single mail transaction. The default handling won't allow
+/// this but a custom implementation could.
 pub trait HandleErrorInChain: Send + Sync + 'static {
     type Fut: Future<Item=(Connection, bool), Error=std_io::Error> + Send;
 
-    fn handle_error(&self, con: Connection, msg_idx: usize, logic_error: &LogicError) -> Self::Fut;
+    /// handle the error on given connection for the `msg_idx`-ed command
+    /// given the given logic error
+    fn handle_error(&self, con: Connection, msg_idx: usize, logic_error: &LogicError)
+        -> Self::Fut;
 }
 
-
+/// send all commands in `chain` through the given connection one
+/// after another
 pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
     -> impl Future<Item=(Connection, Result<(), (usize, LogicError)>), Error=std_io::Error> + Send
     where H: HandleErrorInChain
@@ -68,7 +77,9 @@ pub fn chain<H>(con: Connection, chain: Vec<BoxedCmd>, on_error: H)
     fut
 }
 
-
+/// Decide if a error should just stop sending commands or should
+/// also trigger the sending of `RSET` stopping the current mail
+/// transaction
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum OnError {
     StopAndReset,
