@@ -65,14 +65,6 @@ impl<S> DotStashedWrite<S>
     }
 
     fn write_dot_stashed_output(&mut self, unstashed: S::Item) {
-        //TODO[buf_management]: scan if unstashed needs stashing and only if so write it, so:
-        //  1. have a "default" buffer (maybe mem::replace(&mut bufer.output, Bytes::new())
-        //  2. have a alternate buffer which is "just" a S::Item
-        //  3. consider using Chain
-        //      - but what is with default -> alternate -> default chains
-        //        (which are potentially broken)
-        //IDEA: have a ChainedRingBuffer chaining slices to a default buffer and already "ready"
-        //      buffers into a chain "ring"
         let mut state = self.stash_state;
         {
             let raw_len = unstashed.remaining();

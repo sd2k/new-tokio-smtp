@@ -31,23 +31,11 @@ impl Io {
         let socket = &mut self.socket;
 
         //TODO limit the buffer size (configurable) to limit smtp response line size
-        // reverse more buffer (this is currently _not_ limited,
-        // through limiting it needs special handling wrt. to
-        // notifying once the buffer is less full)
-        //
-        // if buffer size is not limited in a if-full-error way the containing loop
-        // has to be replicated at the outside including a consumer of the buffer
         loop {
-
-            // make sure at last 1 byte can be read to the buffer
-            // (grow the buffer in multiples of INPUT_BUFFER_INC_SIZE)
-            // it's unlikely that this buffer will ever be filled
             if input.remaining_mut() == 0 {
                 input.reserve(INPUT_BUFFER_INC_SIZE);
             }
 
-            // read as many bytes as possible
-            // if not ready then return
             match socket.read_buf(input) {
                 Ok(Async::NotReady) => return Ok(ReadState::NotReady),
                 Ok(Async::Ready(0)) => return Ok(ReadState::SocketClosed),
@@ -57,16 +45,11 @@ impl Io {
         }
     }
 
-    //TODO split this into multiple functions `scan line` -> &[u8] -> parse -> pop`
-    //TODO be aware that try_read_line does only work on soly continous buffers, e.g. it
-    // would fail with a Chain as it wants to slice the buffer
-    /// pops a line from `buffer.input` if there is a complete on
+
+    /// # Implementation Limitations
     ///
-    /// The line ending is "\r\n".
-    /// If a line is found it's passed to `parse_line_fn` and the result of
-    /// it is returned, the line is only removed from the input buffer after
-    /// `parse_line_fn` succeded, if it fails the line is not removed.
-    ///
+    /// Be aware that try_read_line does only work on continuous buffers.
+    /// I.e. it would fail if `self.in_buffer()` is a `Chain`
     pub fn try_pop_line<F, R, E>(&mut self, parse_line_fn: F)
                                  -> Result<Option<R>, E>
         where F: FnOnce(&[u8]) -> Result<R, E>
@@ -80,12 +63,8 @@ impl Io {
             .map(|(idx, _)| idx);
 
         if let Some(eol) = eol {
-            // passes in without line ending
             let parsed = parse_line_fn(&input[..eol])?;
-            // advance through line ending
             input.advance(eol + 2);
-            // the start of the buffer was moved to eol + 2
-            // so now return 0 as new scan offset
             Ok(Some(parsed))
         } else {
             Ok(None)

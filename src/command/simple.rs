@@ -148,7 +148,6 @@ impl Cmd for Help {
     fn check_cmd_availability(&self, _caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
-        //TODO check if this is always enabled
         Ok(())
     }
 

@@ -211,7 +211,6 @@ pub type MailSendResult = Result<(), (usize, LogicError)>;
 pub type MailSendFuture = Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>;
 
 pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
-    //TODO better error
     -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
     where H: HandleErrorInChain
 {

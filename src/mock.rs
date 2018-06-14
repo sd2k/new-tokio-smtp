@@ -56,7 +56,8 @@ impl ActionData {
                 let use_len = min(blob.len(), other.len());
                 let other = &other[..use_len];
                 let blob = &blob[..use_len];
-                //TODO better error message (assert_eq is a BAD idea here)
+                //TODO better error message (assert_eq is a BAD idea here as
+                // it will flood the output)
                 assert!(blob == other, "unexpected data");
             },
             ActionData::Lines(ref lines) => {
@@ -65,7 +66,8 @@ impl ActionData {
                     let use_len = min(line.len(), rem.len());
                     let use_of_line = &line[..use_len];
                     let other = &rem[..use_len];
-                    //TODO better error message (assert_eq is a BAD idea here)
+                    //TODO better error message (assert_eq is a BAD idea here as
+                    // it will flood the output)
                     assert!(use_of_line.as_bytes() == other, "unexpected data");
 
                     if use_len < line.len() {
@@ -578,10 +580,6 @@ fn write_n_to_slice(from: &[u8], to: &mut [u8], n: usize) {
     to[..n].copy_from_slice(&from[..n]);
 }
 
-//TODO potentially add some overlap detection
-// i.e. detect if a async read/write/poll was done _before_
-// notify was called, which could be done but _should_ not
-// be done
 fn delayed_waker() -> mpsc::UnboundedSender<Task> {
 
     let (tx, rx) = mpsc::unbounded();

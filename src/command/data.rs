@@ -50,7 +50,6 @@ impl<S: 'static> Cmd for Data<S>
             .and_then(Io::parse_response)
             .ctx_and_then(move |io, response| {
                 if response.code() != codes::START_MAIL_DATA {
-                    //TODO differ in error between Fault/IoError/TlsError(potential fault?)
                     return Either::A(future::ok((io, Err(LogicError::UnexpectedCode(response)))));
                 }
 

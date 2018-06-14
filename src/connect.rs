@@ -46,7 +46,6 @@ impl Connection {
         let ConnectionConfig { addr, security, client_id, auth_cmd } = config;
         let con_fut = match security {
             Security::None => {
-                //TODO use Treither??
                 Either::B(Either::A(Connection::_connect_insecure(&addr, client_id)))
             },
             Security::DirectTls(tls_config) => {
@@ -184,7 +183,12 @@ pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     pub client_id: ClientIdentity
 }
 
-//TODO replace with_... with builder
+//IMPROVE: potentially crate a type safe builder chain
+// e.g. ConnectionBuilder
+//      ::connect_with_tls(addr, domain)/::connect_with_starttls(addr, domain)
+//      .identity(clientidentity) / .identitfy_as_localhost()
+//      .auth(cmd) / .build() //uses auth Nop
+//      .build()
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
     where A: Cmd
 {
