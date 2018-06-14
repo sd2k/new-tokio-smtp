@@ -8,9 +8,25 @@ use ::ascii::IgnoreAsciiCaseStr;
 
 use ::data_types::{Domain, AddressLiteral, EhloParam, Capability};
 
+/// Represents the identity of an client
+///
+/// If you connect to an MSA this can be as simple as
+/// localhost, through for smtp communication between
+/// servers or for connecting with an MX server this
+/// should be a public facing domain or ip address
+///
+/// ---
+///
+/// MSA: Mail Submission Agent
+///
+/// MX: Mail Exchanger
+///
 #[derive(Debug, Clone)]
 pub enum ClientIdentity {
+    /// a registered domain
     Domain(Domain),
+    /// a ipv4/ipv6 address, through theoretically others protocols are
+    /// possible too
     AddressLiteral(AddressLiteral)
 }
 
@@ -47,11 +63,22 @@ impl From<Ipv6Addr> for ClientIdentity {
     }
 }
 
+/// A Tls configuration
+///
+/// This consists of a domain, which is the domain of the
+/// server we connect to and a `SetupTls` instance,
+/// which can be used to modify the tls setup e.g. to
+/// use a client certificate for authentication.
+///
+/// The `SetupTls` default to `DefaultTlsSetup` which
+/// is enough for most use cases.
 #[derive(Debug, Clone)]
 pub struct TlsConfig<S = DefaultTlsSetup>
     where S: SetupTls
 {
+    /// domain of the server we connect to
     pub domain: Domain,
+    /// setup allowing modifying TLS setup process
     pub setup: S
 }
 
@@ -61,11 +88,14 @@ impl From<Domain> for TlsConfig {
     }
 }
 
-
+/// Trait used when setting up tls to modify the setup process
 pub trait SetupTls: Debug + Send + 'static {
+
+    /// Accepts a connection builder and returns a connector if possible
     fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>;
 }
 
+/// The default tls setup, which just calls `builder.build()`
 #[derive(Debug, Clone)]
 pub struct DefaultTlsSetup;
 
@@ -102,6 +132,10 @@ pub(crate) fn map_tls_err(err: native_tls::Error) -> std_io::Error {
     )
 }
 
+/// A type representing the ehlo response of the last ehlo call
+///
+/// This is mainly used to check if a certain capability/command
+/// is supported. E.g. if SMTPUTF8 is supported.
 #[derive(Debug, Clone)]
 pub struct EhloData {
     domain: Domain,
@@ -110,16 +144,20 @@ pub struct EhloData {
 
 impl EhloData {
 
+    /// create a new Ehlo data from the domain with which the server responded and the
+    /// ehlo parameters of the response
     pub fn new(domain: Domain, data: HashMap<Capability, Vec<EhloParam>>) -> Self {
         EhloData { domain, data }
     }
 
+    /// check if a ehlo contained a specific capability e.g. `SMTPUTF8`
     pub fn has_capability<A>(&self, cap: A) -> bool
         where A: AsRef<str>
     {
         self.data.contains_key(<&IgnoreAsciiCaseStr>::from(cap.as_ref()))
     }
 
+    /// get the parameters for a specific capability e.g. the size of `SIZE`
     pub fn get_capability_params<A>(&self, cap: A) -> Option<&[EhloParam]>
         where A: AsRef<str>
     {
@@ -127,10 +165,12 @@ impl EhloData {
             .map(|vec| &**vec)
     }
 
+    /// return a reference to the inner hash map
     pub fn capability_map(&self) -> &HashMap<Capability, Vec<EhloParam>> {
         &self.data
     }
 
+    /// the domain for which the server acts
     pub fn domain(&self) -> &Domain {
         &self.domain
     }
