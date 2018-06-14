@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
+/// represents a smtp extension/capability indicated through ehlo
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Capability(EsmtpKeyword);
 
@@ -38,26 +39,65 @@ impl Into<EsmtpKeyword> for Capability {
     }
 }
 
+/// represents an EsmtpKeyword (syntax construct in ehlo response)
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EsmtpKeyword(IgnoreAsciiCaseString);
 
+/// represents an EsmtpValue (syntax construct in ehlo response)
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EsmtpValue(String);
 
+/// represents an EsmtpParam (syntax construct in ehlo response)
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EhloParam(String);
 
+/// represents a `Domain`
+///
+/// Note that currently no parse is implemented for `Domain`,
+/// i.e. validation has to be done by the user converting their
+/// representation to out using `from_unchecked`.
+///
+/// Note that the domain is expected to be ascii non ascii
+/// strings should be puny encoded.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Domain(IgnoreAsciiCaseString);
 
+/// represents a `AddressLiteral`
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct AddressLiteral(IgnoreAsciiCaseString);
 
-//if parsed can not be an empty string
+/// represents a forward path, most times this is just a mail address
+///
+/// Note that this type is not supposed to contain the surrounding `'<'` and `'>'`.
+/// They will be added automatically.
+///
+/// Note that currently no parser is implemented and that the
+/// allowed grammar of the forward path changes depending on
+/// the `EsmtKeywords` in EHLO and on the parameters of the
+/// _previously_ send `MAIL` command. This and the fact that
+/// part of the grammar of forward paths are discouraged to
+/// be used makes it a bit of a wast of time to implement the
+/// grammar here. Through `send_mail` actually does know about
+/// `SMTPUTF8` and keeps track of it.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ForwardPath(String);
 
-//even if parsed can be an empty string
+/// represents a reverse path, most times this is just a mail address
+///
+/// Note that this type is not supposed to contain the surrounding `'<'` and `'>'`.
+/// They will be added automatically.
+///
+/// Note that this can be an empty string, representing a empty reverse path
+/// (donated in smtp with `<>`).
+///
+/// Note that currently no parser is implemented and that the
+/// allowed grammar of the forward path changes depending on
+/// the `EsmtKeywords` in EHLO and on the parameters of the
+/// the `MAIL` command it's used in. This and the fact that
+/// part of the grammar of reverse paths are discouraged to
+/// be used makes it a bit of a wast of time to implement the
+/// grammar here. Through `send_mail` actually does know about
+/// `SMTPUTF8` and keeps track of it.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ReversePath(String);
 
@@ -65,10 +105,12 @@ macro_rules! impl_str_wrapper {
     ($($name:ident),*) => ($(
 
         impl $name {
+            /// return the inner representation as `&str`
             pub fn as_str(&self) -> &str {
                 self.0.as_ref()
             }
 
+            /// create a new instance from a string without validating the input
             pub fn from_str_unchecked<I>(data: I) -> Self
                 where I: Into<String>
             {
@@ -119,6 +161,18 @@ impl_str_wrapper!(
 
 impl ReversePath {
 
+    /// creates an empty reverse path
+    ///
+    /// In a mail command this will lead to `"MAIL FROM:<>"`.
+    /// Note that the `'<'`,`'>'` are not part of the content
+    /// so the content is an empty string.
+    ///
+    /// ```
+    /// use new_tokio_smtp::ReversePath;
+    ///
+    /// let rpath = ReversePath::empty();
+    /// assert_eq!(rpath.as_str(), "");
+    /// ```
     pub fn empty() -> Self {
         ReversePath("".to_owned())
     }
@@ -142,6 +196,11 @@ impl FromStr for EhloParam {
 
 impl EsmtpKeyword {
 
+    /// create a new `EsmtpKeyword` from a string
+    ///
+    /// This validates the input, possible creating a
+    /// syntax error. Alternatively `"string".parse()`
+    /// can be used as `EsmtpKeyword` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
         where I: AsRef<str> + Into<String>
     {
@@ -171,6 +230,12 @@ impl FromStr for EsmtpKeyword {
 }
 
 impl EsmtpValue {
+
+     /// create a new `EsmtpValue` from a string
+    ///
+    /// This validates the input, possible creating a
+    /// syntax error. Alternatively `"string".parse()`
+    /// can be used as `EsmtpValue` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
         where I: AsRef<str> + Into<String>
     {
@@ -205,6 +270,7 @@ impl FromStr for Capability {
 
 impl Domain {
 
+    /// creates a new domain without validating it's correctness
     pub fn new_unchecked(domain: String) -> Self {
         Domain(domain.into())
     }

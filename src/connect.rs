@@ -47,6 +47,8 @@ impl Connection {
         where S: SetupTls, A: Cmd + Send
     {
         let ConnectionConfig { addr, security, client_id, auth_cmd } = config;
+
+        #[allow(deprecated)]
         let con_fut = match security {
             Security::None => {
                 Either::B(Either::A(Connection::_connect_insecure(&addr, client_id)))
