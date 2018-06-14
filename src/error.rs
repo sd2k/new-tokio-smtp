@@ -34,8 +34,12 @@ impl Error for ConnectingFailed {
 
 impl Display for ConnectingFailed {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        //TODO better implementation
-        Debug::fmt(self, fter)
+        use self::ConnectingFailed::*;
+        match *self {
+            Io(ref err) => write!(fter, "I/O-Error: {}", err),
+            Setup(ref err) => write!(fter, "Setup-Error: {}", err),
+            Auth(ref err) => write!(fter, "Authentication-Error: {}", err)
+        }
     }
 }
 
