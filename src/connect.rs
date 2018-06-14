@@ -40,6 +40,8 @@ fn cmd_future2connecting_future<LE: 'static, E>(
 }
 
 impl Connection {
+
+    /// open a connection to an smtp server using given configuration
     pub fn connect<S, A>(config: ConnectionConfig<A, S>)
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls, A: Cmd + Send
@@ -66,6 +68,7 @@ impl Connection {
         fut
     }
 
+    #[doc(hidden)]
     pub fn _connect_insecure_no_ehlo(addr: &SocketAddr)
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
     {
@@ -80,6 +83,7 @@ impl Connection {
         fut
     }
 
+    #[doc(hidden)]
     pub fn _connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, config: TlsConfig<S>)
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls
@@ -95,6 +99,7 @@ impl Connection {
         fut
     }
 
+    #[doc(hidden)]
     pub fn _connect_insecure(addr: &SocketAddr, clid: ClientIdentity)
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
     {
@@ -112,6 +117,7 @@ impl Connection {
         fut
     }
 
+    #[doc(hidden)]
     pub fn _connect_direct_tls<S>(
         addr: &SocketAddr,
         clid: ClientIdentity,
@@ -132,6 +138,7 @@ impl Connection {
         fut
     }
 
+    #[doc(hidden)]
     pub fn _connect_starttls<S>(
         addr: &SocketAddr,
         clid: ClientIdentity,
@@ -164,13 +171,19 @@ impl Connection {
     }
 }
 
-
+/// configure what kind of security is used
 #[derive(Debug, Clone)]
 pub enum Security<S>
     where S: SetupTls
 {
+    /// use a plain non encrypted connection
+    #[deprecated(
+        since="0.0",
+        note="it's strongly discourage to use unencrypted connections for private information/auth etc.")]
     None,
+    /// directly connect with TCP-TLS to smtp server
     DirectTls(TlsConfig<S>),
+    /// connect with just TCP and then start TLS with the STARTTLS command
     StartTls(TlsConfig<S>)
 }
 
@@ -178,9 +191,17 @@ pub enum Security<S>
 pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     where S: SetupTls, A: Cmd
 {
+    /// the address and port to connect to (i.e. the ones of the smtp server)
     pub addr: SocketAddr,
+    /// a command used for authentication (use NOOP if you don't auth)
     pub auth_cmd: A,
+    /// the kind of TLS mechanism used when setting up the connection
     pub security: Security<S>,
+    /// the client identity, i.e. your "identity"
+    ///
+    /// This is relevant for the communication between smtp server, through
+    /// for connecting to an MSA (e.g. thunderbird connecting to gmail)
+    /// using localhost (`[127.0.0.1]`) is enough
     pub client_id: ClientIdentity
 }
 
@@ -194,6 +215,12 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     where A: Cmd
 {
 
+    /// create a connection config using direct tls
+    ///
+    /// This uses the default tls setup. The passed
+    /// in domain is the domain in the certificate
+    /// of the server used to make sure you connected
+    /// to the right server (e.g. `smtp.ethereal.email`)
     pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientIdentity, auth_cmd: A) -> Self {
         ConnectionConfig {
             addr, auth_cmd,
@@ -202,6 +229,12 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
         }
     }
 
+    /// create a connection config using starttls
+    ///
+    /// This uses the default tls setup. The passed
+    /// in domain is the domain in the certificate
+    /// of the server used to make sure you connected
+    /// to the right server (e.g. `smtp.ethereal.email`)
     pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientIdentity, auth_cmd: A) -> Self {
         ConnectionConfig {
             addr, auth_cmd,
