@@ -4,10 +4,18 @@ use std::fmt::{self, Display, Debug};
 use ::data_types::{Capability, EsmtpKeyword};
 use ::response::Response;
 
+/// error representing that creating a connection failed
 #[derive(Debug)]
 pub enum ConnectingFailed {
+    /// an I/O-Error ocurred while setting up the connection
     Io(std_io::Error),
+
+    /// some non-io, non auth part failed during setup
+    ///
+    /// e.g. sending EHLO returned an error code
     Setup(LogicError),
+
+    /// the authentication command failed
     Auth(LogicError)
 }
 
@@ -51,6 +59,13 @@ pub fn check_response(response: Response) -> Result<Response, LogicError> {
     }
 }
 
+/// An error representing that a command was successfully send and the response was
+/// successfully received but the response code indicated an error.
+///
+/// This is also used if the `Connection` detects that a command is not available
+/// _before_ it was sent, e.g. `EHLO` doesn't contain `STARTTLS` and you send `STARTTLS`.
+/// In such a case no command was send to the server, saving one round trip which would
+/// fail anyway.
 #[derive(Debug)]
 pub enum LogicError {
     /// The server replied with a error response code
@@ -115,7 +130,10 @@ impl Display for LogicError {
     }
 }
 
-
+/// Error representing that a command can not be used
+///
+/// This is the case if ehlo does not advertises that it supports the command,
+/// e.g. the response does not contain the ehlo keyword `SMTPUTF8`
 #[derive(Debug, Clone)]
 pub struct MissingCapabilities {
     capabilities: Vec<Capability>
