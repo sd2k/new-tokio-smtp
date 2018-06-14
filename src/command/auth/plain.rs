@@ -1,4 +1,6 @@
+use std::fmt::{self, Display};
 use std::sync::Arc;
+use std::error::{Error as ErrorTrait};
 
 use base64::encode;
 
@@ -17,7 +19,6 @@ pub struct AuthPlain {
 
 impl AuthPlain {
 
-    //TODO check non null
     pub fn from_username<I1, I2>(user: I1, password: I2) -> Result<Self, NullCodePoint>
         where I1: Into<String> + AsRef<str>, I2: Into<String> + AsRef<str>
     {
@@ -32,7 +33,6 @@ impl AuthPlain {
         })
     }
 
-    //TODO check non null
     pub fn new<I1,I2,I3>(
         authorization_identity: I1,
         authentication_identity: I2,
@@ -111,7 +111,21 @@ fn validate_no_null_cps<R>(inp: R) -> Result<(), NullCodePoint>
     Ok(())
 }
 
-//TODO impl error
-#[derive(Debug, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct NullCodePoint;
 
+impl Display for NullCodePoint {
+    fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
+        fter.write_str(self.description())
+    }
+}
+
+impl ErrorTrait for NullCodePoint {
+    fn description(&self) -> &str {
+        "input (username/password) contained null byte"
+    }
+
+    fn cause(&self) -> Option<&ErrorTrait> {
+        None
+    }
+}
