@@ -7,9 +7,14 @@ pub struct Response {
 
 impl Response {
 
-    //TODO make sure lines has at last one entry, other
-    // parts might panic if there is not at last one entry in lines
-    pub fn new(code: ResponseCode, lines: Vec<String>) -> Self {
+    /// crate a new Response from a response code and a number of lines
+    ///
+    /// If lines is empty a single empty line will be pushed to the
+    /// lines `Vec`.
+    pub fn new(code: ResponseCode, mut lines: Vec<String>) -> Self {
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
         Response { code, lines }
     }
 

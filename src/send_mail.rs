@@ -252,7 +252,6 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     Either::A(chain(con, cmd_chain, on_error))
 }
 
-//TODO[rust/impl Trait extended] turn this into an extension trait, when viable
 impl Connection {
     pub fn send_mail(self, envelop: MailEnvelop)
         -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send

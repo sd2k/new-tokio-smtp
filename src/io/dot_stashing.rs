@@ -107,7 +107,7 @@ impl<S> Future for DotStashedWrite<S>
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             //TODO the think below is needed so to handle put wrt. buffer capacity (it panics
-            // if it rans out of capacity)
+            // if it runs out of capacity)
             //TODO this can be improved to not flush each slice before dot-stashing the next slice
             // e.g. while buffer has space write dot stashed bytes from self.pending into
             // out buffer while poll_flush is NotReady
