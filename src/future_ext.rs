@@ -1,11 +1,40 @@
 use futures::{Future, IntoFuture, Poll, Async};
 
+/// A helper trait implemented on Futures
+///
+/// This is implemented on futures which resolve to an
+/// item of the form `(Ctx, Result<Item, Err>)` and adds
+/// chaining methods which are based on the result inside
+/// the item instead of the result the future resolves to
 pub trait ResultWithContextExt<Ctx, I, E>: Future<Item=(Ctx, Result<I, E>)> {
+
+    /// use this to chain based on the Ctx and _inner_ item in a future
+    /// like `Future<(Ctx, Result<Item, Err>), Err2>`
+    ///
+    /// given a `Future<(Ctx, Result<Item, Err>), Err2>` this:
+    ///
+    /// 1. resolves forwards the result of resolving the future if
+    ///     1. the future resolves to err (Err2)
+    ///     2. the inner result is a error (Err)
+    /// 2. calls `f(ctx, item)` if the inner result is Ok
+    ///     note that the result of f has to be convertible into an
+    ///     future of the impl `Future<(Ctx, Result<Item2, Err>), Err2>`
     fn ctx_and_then<FN, B, I2>(self, f: FN) -> CtxAndThen<Self, B, FN>
         where FN: FnOnce(Ctx, I) -> B,
               B: IntoFuture<Item=(Ctx, Result<I2, E>), Error=Self::Error>,
               Self: Sized;
 
+    /// use this to chain based on the Ctx and _inner_ error in a future
+    /// like `Future<(Ctx, Result<Item, Err>), Err2>`
+    ///
+    /// given a `Future<(Ctx, Result<Item, Err>), Err2>` this:
+    ///
+    /// 1. resolves forwards the result of resolving the future if
+    ///     1. the future resolves to err (Err2)
+    ///     2. the inner result is ok (Err)
+    /// 2. calls `f(ctx, err)` if the inner result is err
+    ///     note that the result of f has to be convertible into an
+    ///     future of the impl `Future<(Ctx, Result<Item, Err3>), Err2>`
     fn ctx_or_else<FN, B, E2>(self, f: FN) -> CtxOrElse<Self, B, FN>
         where FN: FnOnce(Ctx, E) -> B,
               B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=Self::Error>,
@@ -44,6 +73,7 @@ enum State<P, IM> {
     Intermediate(IM),
 }
 
+/// future adapter see `ResultWithContextExt::ctx_and_then`
 pub struct CtxAndThen<P, B, FN>
     where B: IntoFuture,
 
@@ -87,6 +117,7 @@ impl<P, B, FN, Ctx, I, I2, E> Future for CtxAndThen<P, B, FN>
 
 //FIXME[dry]: dedup code between CtxOrElse/CtxAndThen
 // (macro or something like ctx_on_inner(get_from_result_fn, map_stuf_you_got_fn))
+/// future adapter see `ResultWithContextExt::ctx_or_else`
 pub struct CtxOrElse<P, B, FN>
     where B: IntoFuture,
 
@@ -127,50 +158,6 @@ impl<P, B, FN, Ctx, I, E, E2> Future for CtxOrElse<P, B, FN>
         first_poll_res
     }
 }
-
-//
-//
-//pub struct CtxOrElse<P, B, FN>
-//    where B: IntoFuture,
-//
-//{
-//    state: State<P, B::Future>,
-//    map_fn: Option<FN>
-//}
-//
-//impl<P, B, FN, Ctx, I, E, E2> Future for CtxOrElse<P, B, FN>
-//    where P: Future<Item=(Ctx, Result<I, E>)>,
-//          FN: FnOnce(Ctx, I) -> B,
-//          B: IntoFuture,
-//          B::Future: Future<Item=(Ctx, Result<I, E2>)>,
-//{
-//    type Item = I;
-//    type Error = P::Error;
-//
-//    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//        let (ctx, result) = match self.state {
-//            State::Parent(ref mut p, _) => {
-//                try_ready!(p.poll());
-//            },
-//            State::Intermediate(ref mut im) => {
-//                return im.poll();
-//            },
-//        };
-//
-//        let err = match result {
-//            Ok(item) => return Ok(Async::Ready((ctx, Ok(item)))),
-//            Err(err) => err
-//        };
-//
-//        let map_fn = self.map_fn.take().expect("polled after completion/panic");
-//        let bval = (map_fn)(ctx, err);
-//        let fut = bval.into_future();
-//        let first_poll_res = fut.poll();
-//        self.state = State::Intermediate(fut);
-//
-//        first_poll_res
-//    }
-//}
 
 
 #[cfg(test)]
