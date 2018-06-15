@@ -12,6 +12,7 @@
 //! # #[macro_use] extern crate new_tokio_smtp;
 //! # #[macro_use] extern crate vec1;
 //! # use new_tokio_smtp::command;
+//! use futures::stream::{self, Stream};
 //! use futures::future::{self, lazy, Future};
 //! use new_tokio_smtp::error::GeneralError;
 //! use new_tokio_smtp::{Connection, ConnectionConfig};
@@ -31,7 +32,7 @@
 //!
 //! // this normally adapts to a higher level abstraction
 //! // of mail then this crate provides
-//! let mail_data = Mail::new(EncodingRequirement::None, raw_mail.to_owned().into());
+//! let mail_data = Mail::new(EncodingRequirement::None, raw_mail.to_owned());
 //! // the from_unchecked normally can be used if we know the address is valid
 //! // a mail address parser will be added at some point in the future
 //! let sender = MailAddress::from_str_unchecked("test@sender.test");
@@ -61,39 +62,46 @@
 //!
 //! //or simpler (but with more verbose output)
 //! mock_run_with_tokio(lazy(move || {
-//!     Connection::connect_send_quit(config2, vec![ mail2 ])
-//!         .then(|result| {
-//!             let results = match result {
-//!                 Ok(results) => results,
-//!                 Err((con, mails, results)) => {
-//!                     println!("{} mails where not send due too: {}", mails.len(), con);
-//!                     results
-//!                 }
-//!             };
-//!             for (idx, result) in results.iter().enumerate() {
-//!                 if let Err((_, err)) = result {
-//!                     println!("mail nr {} failed to be send: {}", idx, err)
+//!     let mails = stream::once(Result::Ok::<_, GeneralError>(mail2));
+//!     Connection::connect_send_quit(config2, mails)
+//!         .and_then(|results| {
+//!             results.for_each(|result| {
+//!                 if let Err(err) = result {
+//!                     println!("sending mail failed: {}", err);
 //!                 } else {
-//!                     println!("mail nr {} was send", idx)
+//!                     println!("successfully send mail")
 //!                 }
-//!             }
-//!             Result::Ok::<(),()>(())
+//!                 Ok(())
+//!             })
+//!             // will be gone once `!` is stable
+//!             .map_err(|_| unreachable!())
+//!         })
+//!         .or_else(|conerr| {
+//!             println!("connecting failed: {}", conerr);
+//!             Ok(())
 //!         })
 //! }));
 //!
 //! # // some mock-up, for this example to compile
 //! # fn mock_connection_config() -> ConnectionConfig<command::AuthPlain>
 //! #  { unimplemented!() }
-//! # fn mock_run_with_tokio(f: impl Future) { unimplemented!() }
+//! # fn mock_run_with_tokio(f: impl Future<Item=(), Error=()>) { unimplemented!() }
 //! ```
 //!
 use std::{io as std_io};
+use std::mem::replace;
 
-use futures::future::{self, Either, Future, Loop};
+use bytes::Bytes;
+use futures::{Poll, Async, IntoFuture};
+use futures::future::{self, Either, Future};
+use futures::stream::Stream;
 use vec1::Vec1;
 
 use ::{Cmd, Connection};
-use ::error::{LogicError, MissingCapabilities, GeneralError};
+use ::error::{
+    LogicError, MissingCapabilities,
+    GeneralError, ConnectingFailed
+};
 use ::chain::{chain, OnError, HandleErrorInChain};
 use ::data_types::{ReversePath, ForwardPath};
 use ::command::{self, params_with_smtputf8};
@@ -108,10 +116,18 @@ pub enum EncodingRequirement {
 }
 
 /// A simplified representation of a mail consisting of an `EncodingRequirement` and a buffer
+///
+/// Note that the mail data will be placed internally inside a Bytes instance.
+/// Which means it can easily be promoted to an `Arc` if e.g. cloned allowing
+/// cheaper clone. The need for this arises
+/// from the fact that many smtp applications might want to implement
+/// retry logic. E.g. if the connection is interrupted you might want
+/// to retry sending the mail once the connection is back etc.
+///
 #[derive(Debug, Clone)]
 pub struct Mail {
     encoding_requirement: EncodingRequirement,
-    mail: Vec<u8>
+    mail: Bytes
 }
 
 impl Mail {
@@ -119,9 +135,9 @@ impl Mail {
     /// create a new mail instance given a encoding requirement and a buffer
     ///
     /// The buffer contains the actual mail and is normally a string.
-    pub fn new(encoding_requirement: EncodingRequirement, buffer: Vec<u8>) -> Self {
+    pub fn new(encoding_requirement: EncodingRequirement, buffer: impl Into<Bytes>) -> Self {
         Mail {
-            encoding_requirement, mail: buffer
+            encoding_requirement, mail: buffer.into()
         }
     }
 
@@ -134,9 +150,14 @@ impl Mail {
         self.encoding_requirement
     }
 
-    pub fn into_raw_data(self) -> Vec<u8> {
+    pub fn raw_data(&self) -> &[u8] {
+        self.mail.as_ref()
+    }
+
+    pub fn into_raw_data(self) -> Bytes {
         self.mail
     }
+
 }
 
 /// POD representing the smtp envelops from,to's
@@ -360,61 +381,307 @@ impl Connection {
         send_mail(self, envelop, OnError::StopAndReset)
     }
 
+    /// sends all mails from mails through the connection
+    ///
+    /// The connection is moved into the `SendAllMails` adapter
+    /// and can be retrieved from there. Alternatively `quit_on_completion`
+    /// can be used to make the adapter call quite once all mails are send.
+    pub fn send_all_mails<A, E, M>(
+        con: Connection,
+        mails: M,
+        //FIXME[futures/v>=2.0] use Never instead of ()
+    ) -> SendAllMails<M>
+        where A: Cmd, E: From<GeneralError>, M: Stream<Item=MailEnvelop, Error=E>
+    {
+        SendAllMails::new(con, mails)
+    }
+
     //FIXME put on_error back in
     /// creates a new connection, sends all mails and then closes the connection
     ///
-    /// This will try to send all mails, if sending a mail fails because of `LogicError`
-    /// it will still try to send the other mails. If sending a mail fails because
-    /// of an I/O-Error causing the connection to be lost the not send mails are
-    /// returned. Through currently the mail which caused the failure will be lost
-    /// (which is bad as it's more likely the environment which caused the failure)
+    /// - if sending a mail fails because of `LogicError` it will still try to send the other mails.
+    /// - If sending a mail fails because of an I/O-Error causing the connection to be lost the remaining
+    ///   Mails will fail with `GeneralError::PreviousErrorKilledConnection`.
+    ///
+    /// This function will poll first open a connection _then_ poll mails from the
+    /// `mail` stream sending them through the connection and then close the
+    /// connection. As some mail servers cut off unused connections it might
+    /// be a good idea to make sure all mails are available when the connection
+    /// is opened, i.e. to make sure polling `mails` doesn't have to wait long,
+    /// through if this is necessary depends on the mail server/provider.
+    ///
+    /// As any future/stream this has to be polled to drive it to completion,
+    /// i.e. even if you don't care about the results you have to poll the
+    /// future and then the stream it resolves to.
+    ///
+    /// # Example (where to find it)
     ///
     /// Take a look at the `send_mail` module documentation for an usage example.
-    pub fn connect_send_quit<A>(
+    ///
+    /// To send a number of mails from a vec you can use:
+    ///
+    /// `Connection::connect_send_quit(config, stream::iter_ok::<_, GeneralError>(vec_of_mails))`
+    ///
+    /// To get back a `Vec` of results you can use:
+    ///
+    /// ```no_run
+    /// # extern crate futures;
+    /// # extern crate new_tokio_smtp;
+    /// # use futures::{stream, Future, Stream};
+    /// # use new_tokio_smtp::{Connection, ConnectionConfig, command};
+    /// # use new_tokio_smtp::error::GeneralError;
+    /// # use new_tokio_smtp::send_mail::MailEnvelop;
+    /// # let config: ConnectionConfig<command::Noop> = unimplemented!();
+    /// # let mail_vec: Vec<MailEnvelop> = unimplemented!();
+    /// # let mails = ::futures::stream::iter_ok::<_, GeneralError>(mail_vec.into_iter());
+    /// // note that the map_err is only needed as `!` isn't stable yet
+    /// let fut = Connection::connect_send_quit(config, mails)
+    ///     .and_then(|results| results.collect().map_err(|_| unreachable!()));
+    /// # let _ = fut;
+    /// ```
+    ///
+    /// # Design Note
+    ///
+    /// Note that the implementation intentionally returns a `Item=Result<_,_>, Error=()`
+    /// instead of an `Item=_, Error=_` as some combinators do not play well with cases
+    /// where the stream represents a sequence of results instead of a sequence of items
+    /// where the stream can fail. E.g. `collect` would discard thinks if any mail failed,
+    /// which isn't what is expected/wanted at all.
+    ///
+    ///
+    pub fn connect_send_quit<A, E>(
         config: ConnectionConfig<A>,
-        mails: Vec<MailEnvelop>,
-    ) -> impl Future<
-        Item=Vec<MailSendResult>,
-        Error=(GeneralError, Vec<MailEnvelop>, Vec<MailSendResult>)
-    > + Send
-        where A: Cmd
+        mails: impl Stream<Item=MailEnvelop, Error=E>,
+        //FIXME[futures/v>=2.0] use Never instead of ()
+    ) -> impl Future<Item=impl Stream<Item=Result<(), E>, Error=()>, Error=ConnectingFailed>
+        where A: Cmd, E: From<GeneralError>
     {
-        //stackify
-        let mut mails = mails;
-        mails.reverse();
-
-        let mresults: Vec<MailSendResult> = Vec::new();
-
-        let fut = Connection::connect(config)
-            .then(|result| match result {
-                Err(err) => Err((GeneralError::from(err), mails, mresults)),
-                Ok(con) => Ok((con, mails, mresults))
-            })
-            .and_then(move |(con, mails, mresults)| future::loop_fn((con, mails, mresults),
-                |(con, mut mails, mut mresults)| {
-                    if let Some(mail) = mails.pop() {
-                        let fut = con
-                            .send_mail(mail)
-                            .then(|result| match result {
-                                Ok((con, mail_send_result)) => {
-                                    mresults.push(mail_send_result);
-                                    Ok(Loop::Continue((con, mails, mresults)))
-                                },
-                                Err(io_error) => {
-                                    Err((GeneralError::from(io_error), mails, mresults))
-                                }
-                            });
-
-                        Either::A(fut)
-                    } else {
-                        Either::B(future::ok(Loop::Break((con, mresults))))
+        let fut = Connection
+            ::connect(config)
+            .map(|con| {
+                OnCompletion::new(
+                    SendAllMails::new(con, mails),
+                    |send_adapter| {
+                        if let Some(con) = send_adapter.take_connection() {
+                            Either::A(con.quit().map(|_|()))
+                        } else {
+                            Either::B(future::ok(()))
+                        }
                     }
-                }
-            ))
-            .and_then(|(con, results)| {
-                con.quit().then(|_| Ok(results))
+                )
             });
 
         fut
     }
+}
+
+/// adapter to send a stream of mails through a smtp connection
+pub struct SendAllMails<M> {
+    mails: M,
+    con: Option<Connection>,
+    //FIXME[rust/impl Trait in struct]
+    pending: Option<Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>>,
+}
+
+impl<M> SendAllMails<M>
+    where M: Stream<Item=MailEnvelop>, M::Error: From<GeneralError>
+{
+    /// create a new `SendAllMails` stream adapter
+    pub fn new(con: Connection, mails: M) -> Self {
+        SendAllMails {
+            mails,
+            con: Some(con),
+            pending: None,
+        }
+    }
+
+    /// takes the connection out of the adapter
+    ///
+    /// - if there currently is a pending future this will always be `None`
+    /// - if `mails` is not completed and this adapter is polled afterwards
+    ///   all later mails will fail with `M::Error::from(GeneralError::PreviousErrorKilledConnection)`
+    pub fn take_connection(&mut self) -> Option<Connection> {
+        self.con.take()
+    }
+
+    /// sets the connection to use in the adapter for sending mails
+    ///
+    /// returns the currently set connection, if any
+    pub fn set_connection(&mut self, con: Connection) -> Option<Connection> {
+        ::std::mem::replace(&mut self.con, Some(con))
+    }
+
+    /// true if a mail is currently in the process of being send
+    pub fn is_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+}
+
+impl<M> Stream for SendAllMails<M>
+    where M: Stream<Item=MailEnvelop>, M::Error: From<GeneralError>
+{
+    type Item=Result<(), M::Error>;
+    //FIXME[futures/v>=0.2] use Never
+    type Error=();
+
+    //FIXME[futures/async streams]
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            if let Some(pending) = self.pending.as_mut() {
+                return match pending.poll() {
+                    Ok(Async::NotReady) => Ok(Async::NotReady),
+                    Ok(Async::Ready((con, result))) => {
+                        self.con = Some(con);
+                        let result = result.map_err(|(_idx, logic_err)| {
+                            M::Error::from(GeneralError::from(logic_err))
+                        });
+                        Ok(Async::Ready(Some(result)))
+                    },
+                    Err(io_error) => {
+                        let err = M::Error::from(GeneralError::from(io_error));
+                        Ok(Async::Ready(Some(Err(err))))
+                    }
+                };
+            }
+
+            return match self.mails.poll() {
+                Ok(Async::NotReady) => Ok(Async::NotReady),
+                Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
+                Ok(Async::Ready(Some(mail))) => {
+                    if let Some(con) = self.con.take() {
+                        self.pending = Some(Box::new(con.send_mail(mail)));
+                        continue;
+                    } else {
+                        let err = M::Error::from(GeneralError::PreviousErrorKilledConnection);
+                        Ok(Async::Ready(Some(Err(err))))
+                    }
+                },
+                Err(err) => {
+                    Ok(Async::Ready(Some(Err(err))))
+                }
+            };
+
+        }
+    }
+}
+
+/// stream adapt resolving one function/future after the stream completes
+///
+/// If `S` is fused calling the stream adapter after completion is fine,
+/// through the function will only run the time it completes. I.e. if
+/// `S` restarts after completion `func` _will not_ be called a second
+/// time when it completes again
+pub struct OnCompletion<S, F, UF> {
+    stream: S,
+    state: CompletionState<F, UF>
+    //_u: ::std::marker::PhantomData<U>
+}
+
+enum CompletionState<F, U> {
+    Done,
+    Ready(F),
+    Pending(U)
+}
+
+impl<F, U> CompletionState<F, U> {
+    /// # Panic
+    ///
+    /// panics if the state is `Pending`
+    fn take_func(&mut self) -> Option<F> {
+        use self::CompletionState::*;
+
+        let me = replace(self, CompletionState::Done);
+        match me {
+            Done => None,
+            Ready(func) => Some(func),
+            Pending(_) => panic!("[BUG] take func in pending state")
+        }
+    }
+}
+
+impl<S, F, U> OnCompletion<S, F, U::Future>
+    //FIXME[futures/v>=0.2] Error=Never
+    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture
+{
+    /// creates a new adapter calling func the first time the stream completes.
+    ///
+    /// When the underlying stream completes func is called and the value returned
+    /// by func is turned into a future, while the future is polled the stream is
+    /// `Async::NotReady` and once it resolves the stream will return `Async::Ready(None)`,
+    /// i.e. it will complete.
+    ///
+    /// Note that the return value of the future is completely ignored, independent
+    /// of wether or not it's resolves to an item or an error the value it resolves
+    /// to is just dropped.
+    ///
+    /// If the stream is fused polling the adapter after completion it is fine too.
+    ///
+    pub fn new(stream: S, func: F) -> Self {
+        OnCompletion {
+            stream, state: CompletionState::Ready(func)
+            //, _u: ::std::marker::PhantomData
+        }
+    }
+}
+
+impl<S, F, U> Stream for OnCompletion<S, F, U::Future>
+    //FIXME[futures/v>=0.2] Error=Never
+    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture
+{
+    type Item = S::Item;
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            let is_done =
+                if let &mut CompletionState::Pending(ref mut fut) = &mut self.state {
+                    if let Ok(Async::NotReady) = fut.poll() {
+                        return Ok(Async::NotReady)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+
+            if is_done {
+                self.state = CompletionState::Done;
+                return Ok(Async::Ready(None))
+            }
+
+            let next = try_ready!(self.stream.poll());
+
+            if let Some(next) = next {
+                return Ok(Async::Ready(Some(next)));
+            } else if let Some(func) = self.state.take_func() {
+                let fut = func(&mut self.stream).into_future();
+                self.state = CompletionState::Pending(fut);
+                continue
+            } else {
+                // polled after completion, through maybe S was fused so
+                // just return None
+                return Ok(Async::Ready(None));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ::{Connection, ConnectionConfig, command};
+    use ::error::GeneralError;
+    use ::send_mail::MailEnvelop;
+
+    fn assert_send(_: &impl Send) {}
+
+    #[allow(unused)]
+    fn assert_send_in_send_out() {
+        let config: ConnectionConfig<command::Noop> = unimplemented!();
+        let mail_vec: Vec<MailEnvelop> = unimplemented!();
+        let mails = ::futures::stream::iter_ok::<_, GeneralError>(mail_vec.into_iter());
+        assert_send(&mails);
+        let fut = Connection::connect_send_quit(config, mails);
+        assert_send(&fut);
+    }
+
 }
