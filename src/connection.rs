@@ -297,3 +297,12 @@ impl Cmd for BoxedCmd {
         self._only_once_exec(io)
     }
 }
+
+//FIXME[rustc/specialization]
+// impl<T> From<T> for BoxedCmd
+//     where T: Cmd
+// {
+//     fn from(cmd: T) -> Self {
+//         cmd.boxed()
+//     }
+// }
