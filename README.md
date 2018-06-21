@@ -263,3 +263,6 @@ Change Log
 
 - `v0.4`:
   - renamed `from_str_unchecked` to `from_unchecked`
+  - `Cmd.exec` accepts now `Io` instead of `Connection`
+    - replace `CmdFuture` with `ExecFuture`
+    - `Connection.send_simple_cmd` is now `Io.exec_simple_cmd`
