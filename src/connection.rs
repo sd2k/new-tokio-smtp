@@ -1,18 +1,14 @@
 use std::{io as std_io};
 
-use futures::future::{self, Future, Either, FutureResult};
+use futures::future::{self, Future, Either};
 use tokio::io::{shutdown, Shutdown};
 
 use ::common::EhloData;
 use ::error::{LogicError, MissingCapabilities};
 use ::io::{Io, SmtpResult, Socket};
 
-/// the item the `CmdFuture` resolves to which is `(Connection, Result<Response, LogicError>)`
-pub type CmdFutureItem = (Connection, SmtpResult);
-/// gennerall error of sending a command
-pub type CmdFutureError = std_io::Error;
-/// future by `Cmd.exec` (and wrapped by `Connection.send`)
-pub type CmdFuture = Box<Future<Item=CmdFutureItem, Error=CmdFutureError> + Send + 'static>;
+/// future returned by `Cmd::exec`
+pub type ExecFuture = Box<Future<Item=(Io, SmtpResult), Error=std_io::Error> + Send + 'static>;
 
 /// The basic `Connection` type representing an (likely) open smtp connection
 ///
@@ -112,27 +108,18 @@ impl Connection {
     /// the future will resolve to an `io::Error` and the connection is gone.
     ///
     pub fn send<C: Cmd>(self, cmd: C)
-        -> Either<CmdFuture, FutureResult<CmdFutureItem, CmdFutureError>>
+        -> impl Future<Item=(Connection, SmtpResult), Error=std_io::Error>
     {
-        if let Err(err) = cmd.check_cmd_availability(self.io.ehlo_data()) {
-            Either::B(future::ok((self, Err(LogicError::MissingCapabilities(err)))))
-        } else {
-            Either::A(cmd.exec(self))
-        }
-    }
+        let fut =
+            if let Err(err) = cmd.check_cmd_availability(self.io.ehlo_data()) {
+                Either::B(future::ok((self, Err(LogicError::MissingCapabilities(err)))))
+            } else {
+                Either::A(cmd
+                    .exec(self.into())
+                    .map(|(io, smtp_res)| (Connection::from(io), smtp_res)))
+            };
 
-    /// used to impl. simple commands e.g. `con.send_simple_cmd(&["NOOP"])`
-    pub fn send_simple_cmd(self, parts: &[&str]) -> CmdFuture {
-        let mut io = self.into_inner();
-
-        io.write_line_from_parts(parts);
-
-        let fut = io
-            .flush()
-            .and_then(Io::parse_response)
-            .map(|(io, response)| (Connection::from(io), response));
-
-        Box::new(fut)
+        fut
     }
 
     /// returns true if the capability is known to be supported, false else wise
@@ -228,10 +215,14 @@ pub trait Cmd: Send + 'static {
     /// Executes this command on the given connection
     ///
     /// This method should not be called directly, instead it
-    /// is called by `Connection.send`. Also this method should
-    /// no longer check if the command is available. The check
-    /// has already been done by `Connection.send`
-    fn exec(self, con: Connection) -> CmdFuture;
+    /// is called by `Connection.send`. Which calls this method
+    /// with two addition:
+    ///
+    /// 1. send does use `check_cmd_availability`, so `exec` should
+    ///    not do so as it's unnecessary
+    /// 2. send turns the `Io` instance the returned future resolves to
+    ///    back into a `Connection` instance
+    fn exec(self, io: Io) -> ExecFuture;
 
     /// Turns the command into a `BoxedCmd`
     ///
@@ -274,7 +265,7 @@ pub trait TypeErasableCmd {
     /// (but can't accept `self` instead of `&mut self`
     /// as it requires object-safety)
     #[doc(hidden)]
-    fn _only_once_exec(&mut self, con: Connection) -> CmdFuture;
+    fn _only_once_exec(&mut self, io: Io) -> ExecFuture;
 }
 
 #[doc(hidden)]
@@ -288,9 +279,9 @@ impl<C> TypeErasableCmd for Option<C>
         me.check_cmd_availability(caps)
     }
 
-    fn _only_once_exec(&mut self, con: Connection) -> CmdFuture {
+    fn _only_once_exec(&mut self, io: Io) -> ExecFuture {
         let me = self.take().expect("_only_once_exec called a second time");
-        me.exec(con)
+        me.exec(io)
     }
 }
 
@@ -302,7 +293,7 @@ impl Cmd for BoxedCmd {
         self._check_cmd_availability(caps)
     }
 
-    fn exec(mut self, con: Connection) -> CmdFuture {
-        self._only_once_exec(con)
+    fn exec(mut self, io: Io) -> ExecFuture {
+        self._only_once_exec(io)
     }
 }

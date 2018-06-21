@@ -2,7 +2,7 @@ use futures::future::{self, Either, Future};
 use base64::encode;
 
 use ::future_ext::ResultWithContextExt;
-use ::{Connection, CmdFuture, Cmd, Io, EhloData};
+use ::{ExecFuture, Cmd, Io, EhloData};
 use ::error::{LogicError, MissingCapabilities};
 use super::validate_auth_capability;
 
@@ -42,9 +42,7 @@ impl Cmd for AuthLogin {
         validate_auth_capability(caps, "LOGIN")
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-
-        let mut io = con.into_inner();
+    fn exec(self, mut io: Io) -> ExecFuture {
         let AuthLogin { username, password } = self;
 
         io.write_line_from_parts(&["AUTH LOGIN", username.as_str()]);
@@ -62,8 +60,7 @@ impl Cmd for AuthLogin {
 
                     Either::B(fut)
                 }
-            })
-            .map(move |(io, res)| (Connection::from(io), res));
+            });
 
         Box::new(fut)
 

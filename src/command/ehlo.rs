@@ -7,7 +7,7 @@ use futures::Future;
 use ::error::MissingCapabilities;
 use ::{
     Domain, EhloData, SyntaxError, EhloParam,
-    Cmd, Connection, CmdFuture, Io, Response, ClientIdentity
+    Cmd, ExecFuture, Io, Response, ClientIdentity
 };
 
 
@@ -47,9 +47,7 @@ impl Cmd for Ehlo {
        Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        let mut io = con.into_inner();
-
+    fn exec(self, mut io: Io) -> ExecFuture {
         let str_me = match *self.identity() {
             ClientIdentity::Domain(ref domain) => domain.as_str(),
             ClientIdentity::AddressLiteral(ref addr_lit) => addr_lit.as_str()
@@ -66,14 +64,15 @@ impl Cmd for Ehlo {
         let fut = io
             .flush()
             .and_then(Io::parse_response)
+            //TODO ctx_and_then
             .and_then(|(mut io, result)| match result {
-                Err(response) => Ok((Connection::from(io), Err(response))),
+                Err(response) => Ok((io, Err(response))),
                 Ok(response) => {
                     let ehlo = parse_ehlo_response(&response)
                         .map_err(|err| std_io::Error::new(std_io::ErrorKind::Other, err))?;
 
                     io.set_ehlo_data(ehlo);
-                    Ok((Connection::from(io), Ok(response)))
+                    Ok((io, Ok(response)))
                 }
             });
 

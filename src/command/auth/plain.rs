@@ -4,7 +4,7 @@ use std::error::{Error as ErrorTrait};
 
 use base64::encode;
 
-use ::{Connection, CmdFuture, Cmd, EhloData};
+use ::{ExecFuture, Cmd, EhloData, Io};
 use ::error::MissingCapabilities;
 
 use super::validate_auth_capability;
@@ -63,13 +63,13 @@ impl AuthPlain {
 
     //intentionally no fn password(&self)!
 
-    fn exec_ref(&self, con: Connection) -> CmdFuture {
+    fn exec_ref(&self, io: Io) -> ExecFuture {
         let auth_str = encode(&format!("{}\0{}\0{}",
                                &self.authorization_identity,
                                &self.authentication_identity,
                                &self.password));
 
-        con.send_simple_cmd(&["AUTH PLAIN ", auth_str.as_str()])
+        io.exec_simple_cmd(&["AUTH PLAIN ", auth_str.as_str()])
     }
 }
 
@@ -81,7 +81,7 @@ impl Cmd for AuthPlain {
         validate_auth_capability(caps, "PLAIN")
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
+    fn exec(self, con: Io) -> ExecFuture {
         self.exec_ref(con)
     }
 }
@@ -95,7 +95,7 @@ impl Cmd for Arc<AuthPlain> {
         me.check_cmd_availability(caps)
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
+    fn exec(self, con: Io) -> ExecFuture {
         self.exec_ref(con)
     }
 }

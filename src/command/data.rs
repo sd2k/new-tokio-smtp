@@ -5,7 +5,7 @@ use futures::future::{self, Either, Future};
 use futures::stream::{self, Stream};
 use future_ext::ResultWithContextExt;
 
-use ::{Connection, CmdFuture, Cmd, Io, EhloData};
+use ::{ExecFuture, Cmd, Io, EhloData};
 use ::response::codes;
 use ::error::{LogicError, MissingCapabilities};
 
@@ -41,8 +41,7 @@ impl<S: 'static> Cmd for Data<S>
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        let io = con.into_inner();
+    fn exec(self, io: Io) -> ExecFuture {
         let Data { source } = self;
 
         let fut = io
@@ -58,8 +57,7 @@ impl<S: 'static> Cmd for Data<S>
                     .and_then(Io::parse_response);
 
                 Either::B(fut)
-            })
-            .map(move |(io, result)| (Connection::from(io), result));
+            });
 
         Box::new(fut)
     }

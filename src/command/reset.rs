@@ -4,7 +4,7 @@ use futures::Future;
 
 use ::common::EhloData;
 use ::error::{LogicError, MissingCapabilities};
-use ::{Cmd, CmdFuture, Connection, Io};
+use ::{Cmd, ExecFuture, Io};
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -18,9 +18,7 @@ impl Cmd for Reset {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        let io = con.into_inner();
-
+    fn exec(self, io: Io) -> ExecFuture {
         let fut = io
             .flush_line_from_parts(&["RSET"])
             .and_then(Io::parse_response)
@@ -38,8 +36,7 @@ impl Cmd for Reset {
                 Err(logic_err) => {
                     Err(std_io::Error::new(std_io::ErrorKind::Other, logic_err))
                 }
-            })
-            .map(move |(io, result)| (Connection::from(io), result));
+            });
 
         Box::new(fut)
 

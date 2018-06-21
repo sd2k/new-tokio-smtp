@@ -2,13 +2,14 @@
 //!
 use bytes::BytesMut;
 use bytes::buf::BufMut;
-
+use futures::Future;
 use tokio_tls::TlsStream;
 use tokio::net::TcpStream;
 
 use ::common::EhloData;
 use ::response::Response;
 use ::error::LogicError;
+use super::ExecFuture;
 
 
 mod socket;
@@ -118,6 +119,17 @@ impl Io {
         self.ehlo_data().map(|ehlo| {
             ehlo.has_capability(cap)
         }).unwrap_or(false)
+    }
+
+    /// used to impl. simple commands e.g. `con.send_simple_cmd(&["NOOP"])`
+    pub fn exec_simple_cmd(mut self, parts: &[&str]) -> ExecFuture {
+        self.write_line_from_parts(parts);
+
+        let fut = self
+            .flush()
+            .and_then(Io::parse_response);
+
+        Box::new(fut)
     }
 
 }

@@ -7,7 +7,7 @@ use tokio_tls::TlsConnectorExt;
 
 use ::error::MissingCapabilities;
 use ::{
-    Connection, CmdFuture, Cmd,
+    ExecFuture, Cmd,
     Domain, Capability, EsmtpKeyword,
     map_tls_err, SetupTls, DefaultTlsSetup, EhloData
 };
@@ -59,7 +59,7 @@ fn tls_done_result() -> Response {
 }
 
 
-fn connection_already_secure_error_future() -> CmdFuture {
+fn connection_already_secure_error_future() -> ExecFuture {
     let fut = future::err(std_io::Error::new(
         std_io::ErrorKind::AlreadyExists,
         "connection is already TLS encrypted"
@@ -88,8 +88,7 @@ impl<S> Cmd for StartTls<S>
         })
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        let mut io = con.into_inner();
+    fn exec(self, mut io: Io) -> ExecFuture {
         let StartTls { sni_domain, setup_tls } = self;
 
         let was_mock =
@@ -113,8 +112,7 @@ impl<S> Cmd for StartTls<S>
             };
 
         if was_mock {
-            let con = Connection::from(io);
-            let fut = future::ok((con, Ok(tls_done_result())));
+            let fut = future::ok((io, Ok(tls_done_result())));
             return Box::new(fut);
         }
 
@@ -123,8 +121,7 @@ impl<S> Cmd for StartTls<S>
             .and_then(Io::parse_response)
             .and_then(move |(io, smtp_result)| match smtp_result {
                 Err(response) => {
-                    let con = Connection::from(io);
-                    Either::A(future::ok((con, Err(response))))
+                    Either::A(future::ok((io, Err(response))))
                 },
                 Ok(_) => {
                     let connector = alttry!(
@@ -145,8 +142,8 @@ impl<S> Cmd for StartTls<S>
                         .map_err(map_tls_err)
                         .map(move |stream| {
                             let socket = Socket::Secure(stream);
-                            let con = Connection::from(socket);
-                            (con, Ok(tls_done_result()))
+                            let io = Io::from(socket);
+                            (io, Ok(tls_done_result()))
                         });
 
                     Either::B(fut)

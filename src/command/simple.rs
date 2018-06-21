@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ::data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
 use ::common::EhloData;
 use ::error::MissingCapabilities;
-use ::{Connection, CmdFuture, Cmd};
+use ::{ExecFuture, Cmd, Io};
 
 /// Quit command, but as it makes the connection unusable we do
 /// not publicly provide it for usage with `Connection::send`,
@@ -20,8 +20,8 @@ impl Cmd for Quit {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        con.send_simple_cmd(&["QUIT"])
+    fn exec(self, io: Io) -> ExecFuture {
+        io.exec_simple_cmd(&["QUIT"])
     }
 }
 
@@ -36,8 +36,8 @@ impl Cmd for Noop {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        con.send_simple_cmd(&["NOOP"])
+    fn exec(self, io: Io) -> ExecFuture {
+        io.exec_simple_cmd(&["NOOP"])
     }
 }
 
@@ -70,7 +70,7 @@ impl Cmd for Mail {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
+    fn exec(self, con: Io) -> ExecFuture {
         handle_pathy_cmd(con, "MAIL FROM:", self.reverse_path.as_str(), &self.params)
     }
 }
@@ -99,15 +99,15 @@ impl Cmd for Recipient {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
+    fn exec(self, con: Io) -> ExecFuture {
         handle_pathy_cmd(con, "RCPT TO:", self.forward_path.as_str(), &self.params)
     }
 }
 
-fn handle_pathy_cmd(con: Connection, cmd: &str, path: &str, params: &Params) -> CmdFuture {
+fn handle_pathy_cmd(io: Io, cmd: &str, path: &str, params: &Params) -> ExecFuture {
     //no additional heap alloc
     if params.is_empty() {
-        con.send_simple_cmd(&[cmd, "<", path, ">"])
+        io.exec_simple_cmd(&[cmd, "<", path, ">"])
     } else {
         let mut parts = vec![cmd, "<", path, ">" ];
         for (k, v) in params.iter() {
@@ -118,7 +118,7 @@ fn handle_pathy_cmd(con: Connection, cmd: &str, path: &str, params: &Params) -> 
                 parts.push(v.as_str());
             }
         }
-        con.send_simple_cmd(parts.as_slice())
+        io.exec_simple_cmd(parts.as_slice())
     }
 }
 
@@ -134,8 +134,8 @@ impl Cmd for Verify {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
-        con.send_simple_cmd(&["VRFY ", self.query.as_str()])
+    fn exec(self, io: Io) -> ExecFuture {
+        io.exec_simple_cmd(&["VRFY ", self.query.as_str()])
     }
 }
 
@@ -151,11 +151,11 @@ impl Cmd for Help {
         Ok(())
     }
 
-    fn exec(self, con: Connection) -> CmdFuture {
+    fn exec(self, io: Io) -> ExecFuture {
         if let Some(topic) = self.topic.as_ref() {
-            con.send_simple_cmd(&["HELP ", topic.as_str()])
+            io.exec_simple_cmd(&["HELP ", topic.as_str()])
         } else {
-            con.send_simple_cmd(&["HELP"])
+            io.exec_simple_cmd(&["HELP"])
         }
     }
 }
