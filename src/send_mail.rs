@@ -292,6 +292,18 @@ impl MailAddress {
     }
 }
 
+impl AsRef<str> for MailAddress {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Into<String> for MailAddress {
+    fn into(self) -> String {
+        self.raw
+    }
+}
+
 impl From<MailAddress> for ReversePath {
     fn from(addr: MailAddress) -> ReversePath {
         ReversePath::from_str_unchecked(addr.raw)
