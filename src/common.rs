@@ -30,6 +30,18 @@ pub enum ClientIdentity {
     AddressLiteral(AddressLiteral)
 }
 
+impl ClientIdentity {
+
+    /// creates a client identity for "localhost" (here fixed to 127.0.0.1)
+    ///
+    /// This can be used as client identity when connecting a mail client to
+    /// a Mail Submission Agent (MSA), but should not be used when connecting
+    /// to an Mail Exchanger (MX).
+    pub fn localhost() -> Self {
+        Self::from(Ipv4Addr::new(127, 0, 0, 1))
+    }
+}
+
 impl From<Domain> for ClientIdentity {
     fn from(dm: Domain) -> Self {
         ClientIdentity::Domain(dm)
