@@ -206,20 +206,22 @@ meant to _only_ do SMTP and nothing more. Through there are
 some other limitations, which will be likely to be fixed
 in future versions:
 
-1. no mail address parser, `ForwardPath` and `ReversePath` can
-   only be constructed using `from_str_unchecked` (for now).
-   This will be fixed when I find a library "just" doing mail
-   addresses and doing it right
+1. no mail address parser for `send_mail::MailAddress` and neither
+   a parser for `ForwardPath`/`ReversePath` (they can be constructed
+   using `from_str_unchecked`).  This will be fixed when I find a library
+   "just" doing mail addresses and doing it right.
 
 2. no "build-in" support for extended status codes, this is mainly
-   the way because of time limitations, changing this in a nice
+   the way because I hadn't had time for this, changing this in a nice
    build-in way might require some API changes wrt. to the
    `Response` type and it should be done before `v1.0`
 
 3. The number of provided commands is currently limited to a
    small but useful subset, commands which would be nice
    to provide include `BDAT` and more variations of `AUTH`
-   (currently provided are `PLAIN` and simple `LOGIN`)
+   (currently provided are `PLAIN` and simple `LOGIN` which
+    is enough for most cases but supporting e.g. `OAuth2` would
+    be good)
 
 4. no support for `PIPELINING`, while most extensions can be
    implemented using custom commands, this is not true for
