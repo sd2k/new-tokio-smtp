@@ -539,9 +539,12 @@ impl<M> Stream for SendAllMails<M>
     //FIXME[futures/async streams]
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            if let Some(pending) = self.pending.as_mut() {
+            if let Some(mut pending) = self.pending.take() {
                 return match pending.poll() {
-                    Ok(Async::NotReady) => Ok(Async::NotReady),
+                    Ok(Async::NotReady) => {
+                        self.pending = Some(pending);
+                        Ok(Async::NotReady)
+                    },
                     Ok(Async::Ready((con, result))) => {
                         self.con = Some(con);
                         let result = result.map_err(|(_idx, logic_err)| {
