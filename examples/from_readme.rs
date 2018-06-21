@@ -60,14 +60,14 @@ fn read_request() -> Request {
 
     let config: ConnectionConfig<_> = ConnectionConfig {
         addr: "178.32.207.71:587".parse().unwrap(),
-        security: Security::StartTls(Domain::from_str_unchecked("ethereal.email").into()),
+        security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
         client_id: ClientIdentity::localhost(),
         auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
     };
 
     // the from_unchecked normally can be used if we know the address is valid
     // a mail address parser will be added at some point in the future
-    let send_to = MailAddress::from_str_unchecked("invalid@test.test");
+    let send_to = MailAddress::from_unchecked("invalid@test.test");
 
     // using string fmt to crate mails IS A
     // REALLY BAD IDEA there are a ton of ways
@@ -104,7 +104,7 @@ fn read_email() -> MailAddress {
 
     let mut line = String::new();
     stdin().read_line(&mut line).unwrap();
-    MailAddress::from_str_unchecked(line.trim())
+    MailAddress::from_unchecked(line.trim())
 }
 
 fn read_password() -> String {

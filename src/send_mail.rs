@@ -35,8 +35,8 @@
 //! let mail_data = Mail::new(EncodingRequirement::None, raw_mail.to_owned());
 //! // the from_unchecked normally can be used if we know the address is valid
 //! // a mail address parser will be added at some point in the future
-//! let sender = MailAddress::from_str_unchecked("test@sender.test");
-//! let send_to = MailAddress::from_str_unchecked("test@receiver.test");
+//! let sender = MailAddress::from_unchecked("test@sender.test");
+//! let send_to = MailAddress::from_unchecked("test@receiver.test");
 //! let mail = MailEnvelop::new(sender, vec1![ send_to ], mail_data);
 //!
 //! let mail2 = mail.clone();
@@ -272,7 +272,10 @@ impl MailAddress {
         }
     }
 
-    pub fn from_str_unchecked<I>(raw: I) -> Self
+    /// create a mail from a string not checking syntactical validity
+    ///
+    /// (through it does check if it's an internationalized mail address)
+    pub fn from_unchecked<I>(raw: I) -> Self
         where I: Into<String> + AsRef<str>
     {
         let has_utf8 = raw.as_ref().bytes().any(|b| b >= 0x80);
@@ -306,13 +309,13 @@ impl Into<String> for MailAddress {
 
 impl From<MailAddress> for ReversePath {
     fn from(addr: MailAddress) -> ReversePath {
-        ReversePath::from_str_unchecked(addr.raw)
+        ReversePath::from_unchecked(addr.raw)
     }
 }
 
 impl From<MailAddress> for ForwardPath {
     fn from(addr: MailAddress) -> ForwardPath {
-        ForwardPath::from_str_unchecked(addr.raw)
+        ForwardPath::from_unchecked(addr.raw)
     }
 }
 
@@ -349,12 +352,12 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
        || (check_mime_8bit_support && !con.has_capability("8BITMIME"))
     {
         return Either::B(future::ok(
-            (con, Err((0, MissingCapabilities::new_from_str_unchecked("SMTPUTF8").into())))
+            (con, Err((0, MissingCapabilities::new_from_unchecked("SMTPUTF8").into())))
         ));
     }
 
     let reverse_path = from.map(ReversePath::from)
-        .unwrap_or_else(|| ReversePath::from_str_unchecked(""));
+        .unwrap_or_else(|| ReversePath::from_unchecked(""));
 
     let mut mail_params = Default::default();
     if use_smtputf8 {

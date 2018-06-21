@@ -45,7 +45,7 @@ impl Cmd for Noop {
 pub type Params = HashMap<EsmtpKeyword, Option<EsmtpValue>>;
 
 pub fn params_with_smtputf8(mut p: Params) -> Params {
-    p.insert(EsmtpKeyword::from_str_unchecked("SMTPUTF8"), None);
+    p.insert(EsmtpKeyword::from_unchecked("SMTPUTF8"), None);
     p
 }
 

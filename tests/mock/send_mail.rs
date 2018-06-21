@@ -29,9 +29,9 @@ fn creates_the_right_chain() {
 
     let envelop =
         MailEnvelop::new(
-            MailAddress::from_str_unchecked("t1@test.test"),
+            MailAddress::from_unchecked("t1@test.test"),
             vec1![
-                MailAddress::from_str_unchecked("t2@test.test"),
+                MailAddress::from_unchecked("t2@test.test"),
             ],
             Mail::new(EncodingRequirement::None, Vec::from("the data\r\n.stashed\r\n"))
         );
@@ -61,9 +61,9 @@ fn uses_smtputf8_for_internationalized_mail_addresses() {
 
     let envelop =
         MailEnvelop::new(
-            MailAddress::from_str_unchecked("tü1@test.test"),
+            MailAddress::from_unchecked("tü1@test.test"),
             vec1![
-                MailAddress::from_str_unchecked("tü2@test.test"),
+                MailAddress::from_unchecked("tü2@test.test"),
             ],
             Mail::new(EncodingRequirement::None, Vec::from("the data\r\n.stashed\r\n"))
         );

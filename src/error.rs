@@ -180,11 +180,11 @@ pub struct MissingCapabilities {
 
 impl MissingCapabilities {
 
-    pub fn new_from_str_unchecked<I>(data: I) -> Self
+    pub fn new_from_unchecked<I>(data: I) -> Self
         where I: Into<String>
     {
         MissingCapabilities::new(vec![
-            Capability::from(EsmtpKeyword::from_str_unchecked(data.into()))
+            Capability::from(EsmtpKeyword::from_unchecked(data.into()))
         ])
     }
 

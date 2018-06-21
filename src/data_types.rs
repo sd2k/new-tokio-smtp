@@ -111,7 +111,7 @@ macro_rules! impl_str_wrapper {
             }
 
             /// create a new instance from a string without validating the input
-            pub fn from_str_unchecked<I>(data: I) -> Self
+            pub fn from_unchecked<I>(data: I) -> Self
                 where I: Into<String>
             {
                 let string = data.into();
@@ -509,8 +509,8 @@ mod test {
         }
 
         #[test]
-        fn from_str_unchecked() {
-            let a = Domain::from_str_unchecked("hy");
+        fn from_unchecked() {
+            let a = Domain::from_unchecked("hy");
             assert_eq!(a, "hy");
         }
     }

@@ -109,14 +109,14 @@ fn read_request() -> Request {
 
     let config: ConnectionConfig<_> = ConnectionConfig {
         addr: "178.32.207.71:587".parse().unwrap(),
-        security: Security::StartTls(Domain::from_str_unchecked("ethereal.email").into()),
+        security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
         client_id: ClientIdentity::localhost(),
         auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
     };
 
     // the from_unchecked normally can be used if we know the address is valid
     // a mail address parser will be added at some point in the future
-    let send_to = MailAddress::from_str_unchecked("invalid@test.test");
+    let send_to = MailAddress::from_unchecked("invalid@test.test");
 
     // using string fmt to crate mails IS A
     // REALLY BAD IDEA there are a ton of ways
@@ -153,7 +153,7 @@ fn read_email() -> MailAddress {
 
     let mut line = String::new();
     stdin().read_line(&mut line).unwrap();
-    MailAddress::from_str_unchecked(line.trim())
+    MailAddress::from_unchecked(line.trim())
 }
 
 fn read_password() -> String {
@@ -208,7 +208,7 @@ in future versions:
 
 1. no mail address parser for `send_mail::MailAddress` and neither
    a parser for `ForwardPath`/`ReversePath` (they can be constructed
-   using `from_str_unchecked`).  This will be fixed when I find a library
+   using `from_unchecked`).  This will be fixed when I find a library
    "just" doing mail addresses and doing it right.
 
 2. no "build-in" support for extended status codes, this is mainly
@@ -257,3 +257,9 @@ Contribution
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
+
+Change Log
+----------
+
+- `v0.4`:
+  - renamed `from_str_unchecked` to `from_unchecked`

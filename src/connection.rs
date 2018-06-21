@@ -52,7 +52,7 @@ impl Connection {
     ///     ::lazy(|| mock_create_connection())
     ///     .and_then(|con| {
     ///         con.send(command::Mail::new(
-    ///             ReversePath::from_str_unchecked("test@sender.test")))
+    ///             ReversePath::from_unchecked("test@sender.test")))
     ///     })
     ///     .and_then(|(con, smtp_result)| {
     ///         // using `ctx_and_then`, or `chain` from would make
@@ -61,7 +61,7 @@ impl Connection {
     ///             panic!("server says no {}", err)
     ///         }
     ///         con.send(command::Recipient::new(
-    ///             ForwardPath::from_str_unchecked("test@receiver.test")))
+    ///             ForwardPath::from_unchecked("test@receiver.test")))
     ///     })
     ///     .and_then(|(con, smtp_result)| {
     ///         if let Err(err) = smtp_result {

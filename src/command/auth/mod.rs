@@ -19,7 +19,7 @@ fn validate_auth_capability(caps: Option<&EhloData>, auth_kind: &'static str)
     }).map(|_|())
     .ok_or_else(|| {
         //FIXME specify it to be auth login
-        let mcap = Capability::from(EsmtpKeyword::from_str_unchecked(CAP_AUTH));
+        let mcap = Capability::from(EsmtpKeyword::from_unchecked(CAP_AUTH));
         MissingCapabilities::new(vec![mcap])
     })
 }

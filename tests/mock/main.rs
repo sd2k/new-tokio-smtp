@@ -39,7 +39,7 @@ fn with_capability(con: Connection, cap: &str) -> Connection {
 
     let (domain, mut ehlo_map) = opt_ehlo_data
         .map(|ehlo_data|ehlo_data.into())
-        .unwrap_or_else(|| (Domain::from_str_unchecked("uhmail.test"), HashMap::new()));
+        .unwrap_or_else(|| (Domain::from_unchecked("uhmail.test"), HashMap::new()));
 
     ehlo_map.insert(capability, Vec::new());
 

@@ -27,9 +27,9 @@ use ::error::LogicError;
 ///     ::lazy(|| mock_create_connection())
 ///     .and_then(|con| smtp_chain!(con with OnError::StopAndReset => [
 ///         command::Mail::new(
-///             ReversePath::from_str_unchecked("test@sender.test")),
+///             ReversePath::from_unchecked("test@sender.test")),
 ///         command::Recipient::new(
-///             ForwardPath::from_str_unchecked("test@receiver.test")),
+///             ForwardPath::from_unchecked("test@receiver.test")),
 ///         command::Data::from_buf(concat!(
 ///             "Date: Thu, 14 Jun 2018 11:22:18 +0000\r\n",
 ///             "From: Sendu <test@sender.test>\r\n",

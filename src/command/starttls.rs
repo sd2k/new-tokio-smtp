@@ -83,7 +83,7 @@ impl<S> Cmd for StartTls<S>
                 None
             }
         }).ok_or_else(|| {
-            let mcap = Capability::from(EsmtpKeyword::from_str_unchecked(STARTTLS));
+            let mcap = Capability::from(EsmtpKeyword::from_unchecked(STARTTLS));
             MissingCapabilities::new(vec![mcap])
         })
     }
