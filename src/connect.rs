@@ -244,7 +244,12 @@ pub struct ConnectionConfig<A, S = DefaultTlsSetup>
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
     where A: Cmd
 {
-
+    /// Calls `Connection::connect(self)`.
+    pub fn connect(self)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
+    {
+        Connection::connect(self)
+    }
 }
 
 
@@ -414,6 +419,13 @@ impl<A, S> ConnectionBuilder<A, S>
         ConnectionConfig {
             addr, security, auth_cmd, client_id
         }
+    }
+
+    /// Calls `Connection::connect(self.build())`.
+    pub fn connect(self)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
+    {
+        Connection::connect(self.build())
     }
 }
 
