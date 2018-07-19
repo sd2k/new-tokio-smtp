@@ -1,12 +1,12 @@
 //FIXME see if we can put this into Cargo.toml
-#[cfg(not(feature="mock_impl"))]
+#[cfg(not(feature="mock-impl"))]
 compile_error!("integration tests require \"mock_impl\" feature");
 
 #[macro_use]
 extern crate new_tokio_smtp;
 extern crate futures;
 
-#[cfg(feature="send_mail")]
+#[cfg(feature="send-mail")]
 #[macro_use]
 extern crate vec1;
 
@@ -18,7 +18,7 @@ use new_tokio_smtp::mock::{MockSocket, Actor, ActionData};
 
 mod command;
 mod chain;
-#[cfg(feature="send_mail")]
+#[cfg(feature="send-mail")]
 mod send_mail;
 
 

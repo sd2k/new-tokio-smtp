@@ -96,16 +96,16 @@ impl<S> Cmd for StartTls<S>
                 Socket::Insecure(_) => {
                     false
                 },
-                #[cfg(feature="mock_support")]
+                #[cfg(feature="mock-support")]
                 Socket::Mock(ref mut socket_mock) if !socket_mock.is_secure() => {
                     socket_mock.set_is_secure(true);
                     true
                 }
-                #[cfg(feature="mock_support")]
+                #[cfg(feature="mock-support")]
                 Socket::Secure(_) | Socket::Mock(_) => {
                     return connection_already_secure_error_future();
                 }
-                #[cfg(not(feature="mock_support"))]
+                #[cfg(not(feature="mock-support"))]
                 Socket::Secure(_) => {
                     return connection_already_secure_error_future();
                 },

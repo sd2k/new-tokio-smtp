@@ -34,9 +34,9 @@ extern crate tokio_tls;
 extern crate native_tls;
 extern crate base64;
 extern crate hostname;
-#[cfg(feature="mock_impl")]
+#[cfg(feature="mock-impl")]
 extern crate rand;
-#[cfg(feature="send_mail")]
+#[cfg(feature="send-mail")]
 extern crate vec1;
 // order of modules is also "order" in dependency-tree
 // i.e. module should only import from modules hither
@@ -53,9 +53,9 @@ mod connection;
 mod connect;
 pub mod command;
 pub mod chain;
-#[cfg(feature="mock_impl")]
+#[cfg(feature="mock-impl")]
 pub mod mock;
-#[cfg(feature="send_mail")]
+#[cfg(feature="send-mail")]
 pub mod send_mail;
 
 pub use self::data_types::*;

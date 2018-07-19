@@ -10,10 +10,10 @@ repository = "https://github.com/1aim/new-tokio-smtp"
 version = "0.5.0-wip"
 
 [features]
-default = ['send_mail']
-send_mail = ['vec1']
-mock_support = []
-mock_impl = ["mock_support", "rand"]
+default = ['send-mail']
+send-mail = ['vec1']
+mock-support = []
+mock-impl = ["mock-support", "rand"]
 
 [dependencies]
 futures = "0.1"
