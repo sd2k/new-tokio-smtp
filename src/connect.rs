@@ -16,7 +16,7 @@ use ::common::{
 };
 use ::io::{Io, SmtpResult};
 use ::connection::{
-    Connection, Cmd,
+    Connection, Cmd
 };
 //NOTE: out-of-order (potential circular) dep, but ok in this case
 use ::command::Noop;
@@ -45,6 +45,7 @@ fn cmd_future2connecting_future<LE: 'static, E>(
 
     fut
 }
+
 
 impl Connection {
 
@@ -196,6 +197,31 @@ pub enum Security<S>
     StartTls(TlsConfig<S>)
 }
 
+/// Configuration specifing how to setup an SMTP connection.
+///
+/// Use the `ConnectionBuilder` to crate it.
+/// (Expect if you need a unencrypted connection, in which
+///  case you have to crate it by hand. It's not recommended
+///  to use unencrypted connections for mail).
+///
+/// # Example
+///
+/// ```
+/// use new_tokio_smtp::{ConnectionBuilder, Domain};
+/// use new_tokio_smtp::command::auth::Login;
+///
+/// // For connecting with auth Login using the defaults, i.e.:
+/// // STARTTLS, port 587 and the ip gotten from resolving
+/// // the passed in domain/host name as well as the hostname
+/// // as client identity.
+/// let host = "smtp.gmail.com".parse()
+///     .expect("malformed domain/host name");
+/// let config = ConnectionBuilder
+///     ::new(host)
+///     .expect("could not resolve host name")
+///     .auth(Login::new("user", "password"))
+///     .build();
+/// ```
 #[derive(Debug, Clone)]
 pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     where S: SetupTls, A: Cmd
