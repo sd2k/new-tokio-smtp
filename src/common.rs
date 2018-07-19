@@ -2,10 +2,12 @@ use std::io as std_io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt::Debug;
 use std::collections::HashMap;
+
 use native_tls::{self, TlsConnectorBuilder, TlsConnector};
+use hostname::get_hostname;
+
 
 use ::ascii::IgnoreAsciiCaseStr;
-
 use ::data_types::{Domain, AddressLiteral, EhloParam, Capability};
 
 /// Represents the identity of an client
@@ -38,7 +40,33 @@ impl ClientIdentity {
     /// a Mail Submission Agent (MSA), but should not be used when connecting
     /// to an Mail Exchanger (MX).
     pub fn localhost() -> Self {
+        //TODO use "domain" localhost??
         Self::from(Ipv4Addr::new(127, 0, 0, 1))
+    }
+
+    /// creates a client identity using hostname (fallback localhost)
+    ///
+    /// This uses the `hostname` crate to create a client identity.
+    /// If this fails `ClientIdentity::localhost()` is used.
+    ///
+    pub fn hostname() -> Self {
+        Self::try_hostname()
+            .unwrap_or_else(|| Self::localhost())
+    }
+
+    /// creates a client identity if a hostname can be found
+    ///
+    /// # Implementation Note
+    ///
+    /// As the `hostname` crate currently only returns an `Option`
+    /// we also do so.
+    pub fn try_hostname() -> Option<Self> {
+        get_hostname()
+            .map(|name| {
+                //SEMANTIC_SAFE: the systems hostname should be a valid domain (syntactically)
+                let domain = Domain::new_unchecked(name);
+                ClientIdentity::Domain(domain)
+            })
     }
 }
 

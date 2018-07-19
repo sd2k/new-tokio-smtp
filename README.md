@@ -167,7 +167,6 @@ Concept
 The concept of behind the library is explained
 in the [notes/concept.md](./notes/concept.md) file.
 
-
 Usability Helpers
 ------------------
 

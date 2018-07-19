@@ -33,6 +33,7 @@ extern crate tokio;
 extern crate tokio_tls;
 extern crate native_tls;
 extern crate base64;
+extern crate hostname;
 #[cfg(feature="mock_impl")]
 extern crate rand;
 #[cfg(feature="send_mail")]
