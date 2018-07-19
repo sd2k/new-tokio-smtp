@@ -20,7 +20,7 @@ is provided through two mechanisms:
    a `Io` instance which provides a number of useful functionalities
    for easily implementing new commands, e.g. `Io.parse_response`.
 
-2. syntactic construct's like e.g. `Domain` or `ClientIdentity` can
+2. syntactic construct's like e.g. `Domain` or `ClientId` can
    be parsed but also have "unchecked" constructors, this allows libraries
    which have there own validation to skip redundant validations, e.g.
    if a mail library might provide a `Mailbox` type of mail addresses and
@@ -61,7 +61,7 @@ use futures::future::{lazy, Future};
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::{
     command, Connection, ConnectionConfig,
-    Security, ClientIdentity, Domain
+    Security, ClientId, Domain
 };
 use new_tokio_smtp::send_mail::{
     Mail, EncodingRequirement,
@@ -110,7 +110,7 @@ fn read_request() -> Request {
     let config: ConnectionConfig<_> = ConnectionConfig {
         addr: "178.32.207.71:587".parse().unwrap(),
         security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
-        client_id: ClientIdentity::localhost(),
+        client_id: ClientId::localhost(),
         auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
     };
 

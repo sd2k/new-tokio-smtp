@@ -10,7 +10,7 @@ use ::error::{
 use ::data_types::Domain;
 use ::common::{
     TlsConfig, SetupTls,
-    ClientIdentity, DefaultTlsSetup
+    ClientId, DefaultTlsSetup
 };
 use ::io::{Io, SmtpResult};
 use ::connection::{
@@ -102,7 +102,7 @@ impl Connection {
     }
 
     #[doc(hidden)]
-    pub fn _connect_insecure(addr: &SocketAddr, clid: ClientIdentity)
+    pub fn _connect_insecure(addr: &SocketAddr, clid: ClientId)
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
     {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
@@ -122,7 +122,7 @@ impl Connection {
     #[doc(hidden)]
     pub fn _connect_direct_tls<S>(
         addr: &SocketAddr,
-        clid: ClientIdentity,
+        clid: ClientId,
         config: TlsConfig<S>,
     ) -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
         where S: SetupTls
@@ -143,7 +143,7 @@ impl Connection {
     #[doc(hidden)]
     pub fn _connect_starttls<S>(
         addr: &SocketAddr,
-        clid: ClientIdentity,
+        clid: ClientId,
         config: TlsConfig<S>
     )
         -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
@@ -204,13 +204,13 @@ pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     /// This is relevant for the communication between smtp server, through
     /// for connecting to an MSA (e.g. thunderbird connecting to gmail)
     /// using localhost (`[127.0.0.1]`) is enough
-    pub client_id: ClientIdentity
+    pub client_id: ClientId
 }
 
 //IMPROVE: potentially crate a type safe builder chain
 // e.g. ConnectionBuilder
 //      ::connect_with_tls(addr, domain)/::connect_with_starttls(addr, domain)
-//      .identity(clientidentity) / .identitfy_as_localhost()
+//      .identity(ClientId) / .identitfy_as_localhost()
 //      .auth(cmd) / .build() //uses auth Nop
 //      .build()
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
@@ -223,7 +223,7 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     /// in domain is the domain in the certificate
     /// of the server used to make sure you connected
     /// to the right server (e.g. `smtp.ethereal.email`)
-    pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientIdentity, auth_cmd: A) -> Self {
+    pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientId, auth_cmd: A) -> Self {
         ConnectionConfig {
             addr, auth_cmd,
             security: Security::DirectTls(domain.into()),
@@ -237,7 +237,7 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     /// in domain is the domain in the certificate
     /// of the server used to make sure you connected
     /// to the right server (e.g. `smtp.ethereal.email`)
-    pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientIdentity, auth_cmd: A) -> Self {
+    pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientId, auth_cmd: A) -> Self {
         ConnectionConfig {
             addr, auth_cmd,
             security: Security::StartTls(domain.into()),

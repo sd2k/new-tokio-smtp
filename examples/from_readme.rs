@@ -12,7 +12,7 @@ use futures::future::{lazy, Future};
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::{
     command, Connection, ConnectionConfig,
-    Security, ClientIdentity, Domain
+    Security, ClientId, Domain
 };
 use new_tokio_smtp::send_mail::{
     Mail, EncodingRequirement,
@@ -61,7 +61,7 @@ fn read_request() -> Request {
     let config: ConnectionConfig<_> = ConnectionConfig {
         addr: "178.32.207.71:587".parse().unwrap(),
         security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
-        client_id: ClientIdentity::localhost(),
+        client_id: ClientId::localhost(),
         auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
     };
 

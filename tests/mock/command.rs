@@ -3,7 +3,7 @@
 
 use new_tokio_smtp::{
     command,
-    ClientIdentity,
+    ClientId,
 };
 
 use new_tokio_smtp::mock::{
@@ -16,12 +16,12 @@ use self::ActionData::*;
 use super::{mock, mock_no_shutdown};
 
 
-//fn server_id() -> ClientIdentity {
-//    ClientIdentity::Domain("they.test".parse().unwrap())
+//fn server_id() -> ClientId {
+//    ClientId::Domain("they.test".parse().unwrap())
 //}
 
-fn client_id() -> ClientIdentity {
-    ClientIdentity::Domain("me.test".parse().unwrap())
+fn client_id() -> ClientId {
+    ClientId::Domain("me.test".parse().unwrap())
 }
 
 

@@ -7,34 +7,34 @@ use futures::Future;
 use ::error::MissingCapabilities;
 use ::{
     Domain, EhloData, SyntaxError, EhloParam,
-    Cmd, ExecFuture, Io, Response, ClientIdentity
+    Cmd, ExecFuture, Io, Response, ClientId
 };
 
 
 #[derive(Debug, Clone)]
 pub struct Ehlo {
-    identity: ClientIdentity
+    identity: ClientId
 }
 
 impl Ehlo {
 
-    pub fn new(identity: ClientIdentity) -> Self {
+    pub fn new(identity: ClientId) -> Self {
         Ehlo { identity }
     }
 
-    pub fn identity(&self) -> &ClientIdentity {
+    pub fn identity(&self) -> &ClientId {
         &self.identity
     }
 }
 
-impl From<ClientIdentity> for Ehlo {
-    fn from(identity: ClientIdentity) -> Self {
+impl From<ClientId> for Ehlo {
+    fn from(identity: ClientId) -> Self {
         Ehlo { identity }
     }
 }
 
-impl Into<ClientIdentity> for Ehlo {
-    fn into(self) -> ClientIdentity {
+impl Into<ClientId> for Ehlo {
+    fn into(self) -> ClientId {
         self.identity
     }
 }
@@ -49,8 +49,8 @@ impl Cmd for Ehlo {
 
     fn exec(self, mut io: Io) -> ExecFuture {
         let str_me = match *self.identity() {
-            ClientIdentity::Domain(ref domain) => domain.as_str(),
-            ClientIdentity::AddressLiteral(ref addr_lit) => addr_lit.as_str()
+            ClientId::Domain(ref domain) => domain.as_str(),
+            ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str()
         };
 
         {

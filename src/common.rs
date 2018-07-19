@@ -24,7 +24,7 @@ use ::data_types::{Domain, AddressLiteral, EhloParam, Capability};
 /// MX: Mail Exchanger
 ///
 #[derive(Debug, Clone)]
-pub enum ClientIdentity {
+pub enum ClientId {
     /// a registered domain
     Domain(Domain),
     /// a ipv4/ipv6 address, through theoretically others protocols are
@@ -32,7 +32,7 @@ pub enum ClientIdentity {
     AddressLiteral(AddressLiteral)
 }
 
-impl ClientIdentity {
+impl ClientId {
 
     /// creates a client identity for "localhost" (here fixed to 127.0.0.1)
     ///
@@ -47,7 +47,7 @@ impl ClientIdentity {
     /// creates a client identity using hostname (fallback localhost)
     ///
     /// This uses the `hostname` crate to create a client identity.
-    /// If this fails `ClientIdentity::localhost()` is used.
+    /// If this fails `ClientId::localhost()` is used.
     ///
     pub fn hostname() -> Self {
         Self::try_hostname()
@@ -65,41 +65,41 @@ impl ClientIdentity {
             .map(|name| {
                 //SEMANTIC_SAFE: the systems hostname should be a valid domain (syntactically)
                 let domain = Domain::new_unchecked(name);
-                ClientIdentity::Domain(domain)
+                ClientId::Domain(domain)
             })
     }
 }
 
-impl From<Domain> for ClientIdentity {
+impl From<Domain> for ClientId {
     fn from(dm: Domain) -> Self {
-        ClientIdentity::Domain(dm)
+        ClientId::Domain(dm)
     }
 }
 
-impl From<AddressLiteral> for ClientIdentity {
+impl From<AddressLiteral> for ClientId {
     fn from(adl: AddressLiteral) -> Self {
-        ClientIdentity::AddressLiteral(adl)
+        ClientId::AddressLiteral(adl)
     }
 }
 
-impl From<IpAddr> for ClientIdentity {
+impl From<IpAddr> for ClientId {
     fn from(saddr: IpAddr) -> Self {
         let adl = AddressLiteral::from(saddr);
-        ClientIdentity::from(adl)
+        ClientId::from(adl)
     }
 }
 
-impl From<Ipv4Addr> for ClientIdentity {
+impl From<Ipv4Addr> for ClientId {
     fn from(saddr: Ipv4Addr) -> Self {
         let adl = AddressLiteral::from(saddr);
-        ClientIdentity::from(adl)
+        ClientId::from(adl)
     }
 }
 
-impl From<Ipv6Addr> for ClientIdentity {
+impl From<Ipv6Addr> for ClientId {
     fn from(saddr: Ipv6Addr) -> Self {
         let adl = AddressLiteral::from(saddr);
-        ClientIdentity::from(adl)
+        ClientId::from(adl)
     }
 }
 
