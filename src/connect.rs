@@ -240,43 +240,10 @@ pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     pub client_id: ClientId
 }
 
-//IMPROVE: potentially crate a type safe builder chain
-// e.g. ConnectionBuilder
-//      ::connect_with_tls(addr, domain)/::connect_with_starttls(addr, domain)
-//      .identity(ClientId) / .identitfy_as_localhost()
-//      .auth(cmd) / .build() //uses auth Nop
-//      .build()
+
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
     where A: Cmd
 {
-
-    /// create a connection config using direct tls
-    ///
-    /// This uses the default tls setup. The passed
-    /// in domain is the domain in the certificate
-    /// of the server used to make sure you connected
-    /// to the right server (e.g. `smtp.ethereal.email`)
-    pub fn with_direct_tls(addr: SocketAddr, domain: Domain, clid: ClientId, auth_cmd: A) -> Self {
-        ConnectionConfig {
-            addr, auth_cmd,
-            security: Security::DirectTls(domain.into()),
-            client_id: clid
-        }
-    }
-
-    /// create a connection config using starttls
-    ///
-    /// This uses the default tls setup. The passed
-    /// in domain is the domain in the certificate
-    /// of the server used to make sure you connected
-    /// to the right server (e.g. `smtp.ethereal.email`)
-    pub fn with_starttls(addr: SocketAddr, domain: Domain, clid: ClientId, auth_cmd: A) -> Self {
-        ConnectionConfig {
-            addr, auth_cmd,
-            security: Security::StartTls(domain.into()),
-            client_id: clid
-        }
-    }
 
 }
 
