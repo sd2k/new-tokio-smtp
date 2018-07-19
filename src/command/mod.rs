@@ -11,8 +11,7 @@ pub use self::starttls::*;
 mod data;
 pub use self::data::*;
 
-mod auth;
-pub use self::auth::*;
+pub mod auth;
 
 mod reset;
 pub use self::reset::*;

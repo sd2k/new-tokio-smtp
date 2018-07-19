@@ -20,7 +20,7 @@ use new_tokio_smtp::send_mail::{
 };
 
 struct Request {
-    config: ConnectionConfig<command::AuthPlain>,
+    config: ConnectionConfig<command::auth::Plain>,
     mails: Vec<MailEnvelop>
 }
 
@@ -62,7 +62,7 @@ fn read_request() -> Request {
         addr: "178.32.207.71:587".parse().unwrap(),
         security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
         client_id: ClientId::localhost(),
-        auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
+        auth_cmd: command::auth::Plain::from_username(sender.clone(), passwd).unwrap()
     };
 
     // the from_unchecked normally can be used if we know the address is valid

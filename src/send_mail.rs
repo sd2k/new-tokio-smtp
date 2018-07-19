@@ -83,7 +83,7 @@
 //! }));
 //!
 //! # // some mock-up, for this example to compile
-//! # fn mock_connection_config() -> ConnectionConfig<command::AuthPlain>
+//! # fn mock_connection_config() -> ConnectionConfig<command::auth::Plain>
 //! #  { unimplemented!() }
 //! # fn mock_run_with_tokio(f: impl Future<Item=(), Error=()>) { unimplemented!() }
 //! ```

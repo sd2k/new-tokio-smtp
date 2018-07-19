@@ -7,22 +7,22 @@ use ::error::{LogicError, MissingCapabilities};
 use super::validate_auth_capability;
 
 #[derive(Debug, Clone)]
-pub struct AuthLogin {
+pub struct Login {
     username: String,
     password: String
 }
 
-impl AuthLogin {
+impl Login {
 
     pub fn new(username: &str, password: &str) -> Self {
-        AuthLogin {
+        Login {
             username: encode(username),
             password: encode(password),
         }
     }
 
     pub fn from_base64(username: String, password: String) -> Self {
-        AuthLogin { username, password }
+        Login { username, password }
     }
 
     pub fn base64_username(&self) -> &str {
@@ -34,7 +34,7 @@ impl AuthLogin {
 }
 
 
-impl Cmd for AuthLogin {
+impl Cmd for Login {
 
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
@@ -43,7 +43,7 @@ impl Cmd for AuthLogin {
     }
 
     fn exec(self, mut io: Io) -> ExecFuture {
-        let AuthLogin { username, password } = self;
+        let Login { username, password } = self;
 
         io.write_line_from_parts(&["AUTH LOGIN", username.as_str()]);
 

@@ -11,13 +11,13 @@ use super::validate_auth_capability;
 
 /// AUTH PLAIN smtp authentication based on rfc4954/rfc4616
 #[derive(Debug, Clone)]
-pub struct AuthPlain {
+pub struct Plain {
     authorization_identity: String,
     authentication_identity: String,
     password: String
 }
 
-impl AuthPlain {
+impl Plain {
 
     pub fn from_username<I1, I2>(user: I1, password: I2) -> Result<Self, NullCodePoint>
         where I1: Into<String> + AsRef<str>, I2: Into<String> + AsRef<str>
@@ -26,7 +26,7 @@ impl AuthPlain {
         validate_no_null_cps(&password)?;
 
         let user = user.into();
-        Ok(AuthPlain {
+        Ok(Plain {
             authentication_identity: user.clone(),
             authorization_identity: user,
             password: password.into()
@@ -46,7 +46,7 @@ impl AuthPlain {
         validate_no_null_cps(&authentication_identity)?;
         validate_no_null_cps(&password)?;
 
-        Ok(AuthPlain {
+        Ok(Plain {
             authentication_identity: authentication_identity.into(),
             authorization_identity: authorization_identity.into(),
             password: password.into()
@@ -73,7 +73,7 @@ impl AuthPlain {
     }
 }
 
-impl Cmd for AuthPlain {
+impl Cmd for Plain {
 
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
@@ -86,12 +86,12 @@ impl Cmd for AuthPlain {
     }
 }
 
-impl Cmd for Arc<AuthPlain> {
+impl Cmd for Arc<Plain> {
 
     fn check_cmd_availability(&self, caps: Option<&EhloData>)
         -> Result<(), MissingCapabilities>
     {
-        let me: &AuthPlain = &*self;
+        let me: &Plain = &*self;
         me.check_cmd_availability(caps)
     }
 
