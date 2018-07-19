@@ -112,7 +112,7 @@ impl From<Ipv6Addr> for ClientId {
 ///
 /// The `SetupTls` default to `DefaultTlsSetup` which
 /// is enough for most use cases.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TlsConfig<S = DefaultTlsSetup>
     where S: SetupTls
 {
@@ -136,7 +136,7 @@ pub trait SetupTls: Debug + Send + 'static {
 }
 
 /// The default tls setup, which just calls `builder.build()`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DefaultTlsSetup;
 
 impl SetupTls for DefaultTlsSetup {
