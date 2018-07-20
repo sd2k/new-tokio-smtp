@@ -1,4 +1,4 @@
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr, ToSocketAddrs, Ipv4Addr};
 use std::{io as std_io};
 use std::fmt::Debug;
 
@@ -250,9 +250,87 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     {
         Connection::connect(self)
     }
+
+    /// Creates a connection to `127.0.01` without any form of encryption.
+    ///
+    /// While this is possible **it is not a good idea use this
+    /// for anything but test setups**.
+    pub fn local_unencrypted() -> LocalNonSecureBuilder<Noop> {
+        LocalNonSecureBuilder {
+            client_id: None,
+            port: DEFAULT_SMTP_MSA_PORT,
+            auth_cmd: Noop
+        }
+    }
+}
+
+/// Builder for an `ConnectionConfig` for an unencrypted smtp connection.Cmd
+///
+/// **Should only be used for test setups**
+#[derive(Debug)]
+pub struct LocalNonSecureBuilder<A>
+    where A: Cmd
+{
+    client_id: Option<ClientId>,
+    port: u16,
+    auth_cmd: A
+}
+
+impl<A> LocalNonSecureBuilder<A>
+    where A: Cmd
+{
+    /// overrides the port to use (default: `DEFAULT_SMTP_MSA_PORT`)
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = port;
+        self
+    }
+
+    /// overrides the client id to use (default: `ClientId::hostname()`)
+    pub fn client_id(mut self, client_id: ClientId) -> Self {
+        self.client_id = Some(client_id);
+        self
+    }
+
+    /// sets the auth command to use (default no authentication)
+    pub fn auth<NA>(self, auth_cmd: NA) -> LocalNonSecureBuilder<NA>
+        where NA: Cmd
+    {
+        let LocalNonSecureBuilder {
+            client_id, port, auth_cmd:_
+        } = self;
+
+        LocalNonSecureBuilder {
+            client_id, port, auth_cmd
+        }
+    }
+
+    // builds the connection config
+    pub fn build(self) -> ConnectionConfig<A, DefaultTlsSetup> {
+        let LocalNonSecureBuilder {
+            client_id, port, auth_cmd
+        } = self;
+
+        let client_id = client_id
+            .unwrap_or_else(||ClientId::hostname());
+
+        let addr = SocketAddr::new(Ipv4Addr::new(127,0,0,1).into(), port);
+
+        #[allow(deprecated)]
+        let security = Security::None;
+
+        ConnectionConfig { addr, client_id, auth_cmd, security }
+    }
+
+    /// Calls `Connection::connect(self.build())`.
+    pub fn connect(self)
+        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
+    {
+        Connection::connect(self.build())
+    }
 }
 
 
+/// Builder for an `ConnectionConfig` for a encrypted smtp connection.
 #[derive(Debug)]
 pub struct ConnectionBuilder<A, S = DefaultTlsSetup>
     where S: SetupTls, A: Cmd
