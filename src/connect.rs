@@ -250,6 +250,9 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     {
         Connection::connect(self)
     }
+}
+
+impl ConnectionConfig<Noop, DefaultTlsSetup> {
 
     /// Creates a connection to `127.0.01` without any form of encryption.
     ///
