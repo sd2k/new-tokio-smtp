@@ -255,7 +255,7 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
     ///
     /// While this is possible **it is not a good idea use this
     /// for anything but test setups**.
-    pub fn local_unencrypted() -> LocalNonSecureBuilder<Noop> {
+    pub fn build_local_unencrypted() -> LocalNonSecureBuilder<Noop> {
         LocalNonSecureBuilder {
             client_id: None,
             port: DEFAULT_SMTP_MSA_PORT,
