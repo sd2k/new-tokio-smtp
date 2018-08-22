@@ -275,3 +275,8 @@ Change Log
   - placed all `Auth*` commands into a `auth` module
     (e.g. `AuthPlain` => `auth::Plain`)
   - changed feature naming schema
+
+- `v0.6`
+  - added connection builder for local non secure connections
+  - addec constructors for builders on types they build
+  - renamed `auth::plain::NullCodePoint` to `auth::plain::NullCodePointError`
