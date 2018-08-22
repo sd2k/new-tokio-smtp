@@ -262,6 +262,24 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
             auth_cmd: Noop
         }
     }
+
+    pub fn build(host: Domain)
+        -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
+    {
+        ConnectionBuilder::new(host)
+    }
+
+    pub fn build_with_port(host: Domain, port: u16)
+        -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
+    {
+        ConnectionBuilder::new_with_port(host, port)
+    }
+
+    pub fn build_with_addr(addr: SocketAddr, domain: Domain)
+        -> ConnectionBuilder<Noop, DefaultTlsSetup>
+    {
+        ConnectionBuilder::new_with_addr(addr, domain)
+    }
 }
 
 /// Builder for an `ConnectionConfig` for an unencrypted smtp connection.Cmd
