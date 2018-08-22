@@ -34,6 +34,10 @@ impl Plain {
         })
     }
 
+    /// Create a auth plain command from a authorization identity a authentication identity and a password.
+    ///
+    /// Most times authorization and authentication identities are the same (and happen to be
+    /// the username) in which case `auth::Plain::from_username` can be used.
     pub fn new<I1,I2,I3>(
         authorization_identity: I1,
         authentication_identity: I2,
@@ -54,10 +58,12 @@ impl Plain {
         })
     }
 
+    /// Returns the authorization identity which will be used.
     pub fn authorization_identity(&self) -> &str {
         &self.authorization_identity
     }
 
+    /// Returns the authentication identity which will be used.
     pub fn authentication_identity(&self) -> &str {
         &self.authentication_identity
     }
@@ -112,6 +118,7 @@ fn validate_no_null_cps<R>(inp: R) -> Result<(), NullCodePointError>
     Ok(())
 }
 
+/// Error returned if by auth plain if identity or password contained a null code point.
 #[derive(Copy, Clone, Debug)]
 pub struct NullCodePointError;
 

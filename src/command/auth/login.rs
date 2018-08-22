@@ -6,6 +6,7 @@ use ::{ExecFuture, Cmd, Io, EhloData};
 use ::error::{LogicError, MissingCapabilities};
 use super::validate_auth_capability;
 
+/// Simple implementation of AUTH LOGIN for smtp.
 #[derive(Debug, Clone)]
 pub struct Login {
     username: String,
@@ -14,6 +15,7 @@ pub struct Login {
 
 impl Login {
 
+    /// Create a new auth login command based on username and password.
     pub fn new(username: &str, password: &str) -> Self {
         Login {
             username: encode(username),
@@ -21,10 +23,12 @@ impl Login {
         }
     }
 
+    /// Create a new auth login command based on base64 encoded username and password.
     pub fn from_base64(username: String, password: String) -> Self {
         Login { username, password }
     }
 
+    /// Returns the username contained in the `Login` command.
     pub fn base64_username(&self) -> &str {
         &self.username
     }

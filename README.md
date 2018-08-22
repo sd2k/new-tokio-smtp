@@ -1,4 +1,4 @@
-new-tokio-smtp [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![new-tokio-smtp](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+new-tokio-smtp [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 =====================
 
 The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
