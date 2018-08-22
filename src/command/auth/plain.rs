@@ -19,7 +19,8 @@ pub struct Plain {
 
 impl Plain {
 
-    pub fn from_username<I1, I2>(user: I1, password: I2) -> Result<Self, NullCodePoint>
+    /// Create a auth plain command from a given username and password.
+    pub fn from_username<I1, I2>(user: I1, password: I2) -> Result<Self, NullCodePointError>
         where I1: Into<String> + AsRef<str>, I2: Into<String> + AsRef<str>
     {
         validate_no_null_cps(&user)?;
@@ -37,7 +38,7 @@ impl Plain {
         authorization_identity: I1,
         authentication_identity: I2,
         password: I3
-    ) -> Result<Self, NullCodePoint>
+    ) -> Result<Self, NullCodePointError>
         where I1: Into<String> + AsRef<str>,
               I2: Into<String> + AsRef<str>,
               I3: Into<String> + AsRef<str>
@@ -100,27 +101,27 @@ impl Cmd for Arc<Plain> {
     }
 }
 
-fn validate_no_null_cps<R>(inp: R) -> Result<(), NullCodePoint>
+fn validate_no_null_cps<R>(inp: R) -> Result<(), NullCodePointError>
     where R: AsRef<str>
 {
     for bch in inp.as_ref().bytes() {
         if bch == b'\0' {
-            return Err(NullCodePoint)
+            return Err(NullCodePointError)
         }
     }
     Ok(())
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct NullCodePoint;
+pub struct NullCodePointError;
 
-impl Display for NullCodePoint {
+impl Display for NullCodePointError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         fter.write_str(self.description())
     }
 }
 
-impl ErrorTrait for NullCodePoint {
+impl ErrorTrait for NullCodePointError {
     fn description(&self) -> &str {
         "input (username/password) contained null byte"
     }
