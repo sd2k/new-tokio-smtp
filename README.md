@@ -265,3 +265,13 @@ Change Log
   - `Cmd.exec` accepts now `Io` instead of `Connection`
     - replace `CmdFuture` with `ExecFuture`
     - `Connection.send_simple_cmd` is now `Io.exec_simple_cmd`
+
+- `v0.5`:
+  - improved `ClientId`
+    - renamed `ClientIdentity` to `ClientId`
+    - added `hostname()` constructor
+  - added builder for `ConnectionConfig`
+    - removed old `with_` constructors
+  - placed all `Auth*` commands into a `auth` module
+    (e.g. `AuthPlain` => `auth::Plain`)
+  - changed feature naming schema
