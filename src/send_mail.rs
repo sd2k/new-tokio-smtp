@@ -361,7 +361,6 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
         mail_params  = params_with_smtputf8(mail_params);
     }
     let mut cmd_chain = vec![
-        //FIXME[BUG] use param SMTPUTF8 if use_smtputf8
         command::Mail {
             reverse_path,
             params: mail_params
@@ -396,7 +395,6 @@ impl Connection {
     /// sends all mails from mails through the connection
     ///
     /// The connection is moved into the `SendAllMails` adapter
-    //TODO quit_on_what??
     /// and can be retrieved from there. Alternatively `quit_on_completion`
     /// can be used to make the adapter call quite once all mails are send.
     pub fn send_all_mails<A, E, M>(
@@ -409,7 +407,6 @@ impl Connection {
         SendAllMails::new(con, mails)
     }
 
-    //FIXME put on_error back in
     /// creates a new connection, sends all mails and then closes the connection
     ///
     /// - if sending a mail fails because of `LogicError` it will still try to send the other mails.
@@ -476,20 +473,10 @@ impl Connection {
             .then(|res| match res {
                 Err(err) => Err(E::from(GeneralError::from(err))),
                 Ok(con) => {
-                    Ok(OnCompletion::new(
-                        SendAllMails::new(con, mails),
-                        |send_adapter| {
-                            if let Some(con) = send_adapter.take_connection() {
-                                Either::A(con.quit().map(|_|()))
-                            } else {
-                                Either::B(future::ok(()))
-                            }
-                        }
-                    ))
+                    Ok(SendAllMails::new(con, mails).quit_on_completion())
                 }
             })
-            .into_stream()
-            .flatten();
+            .flatten_stream();
 
         fut
     }
@@ -536,6 +523,46 @@ impl<I, E> SendAllMails<I>
     /// true if a mail is currently in the process of being send
     pub fn is_pending(&self) -> bool {
         self.pending.is_some()
+    }
+
+    /// Quits the contained connection once the stream is completed.
+    ///
+    /// The result from quitting is discarded, which is fine as this
+    /// only happens if:
+    ///
+    /// 1. for some reason the connection was interrupted (the server already quit)
+    /// 2. the server responds with a error to sending the QUIT command
+    ///
+    /// In both cases it's reasonable to simply drop the connection when
+    /// dropping this stream.
+    pub fn quit_on_completion(self) -> impl Stream<Item=(), Error=E> {
+        OnCompletion::new(self, |stream| {
+            if let Some(con) = stream.take_connection() {
+                Either::A(con.quit().then(|_|Ok(())))
+            } else {
+                Either::B(future::ok(()))
+            }
+        })
+    }
+
+    /// Calls a closure once the stream completed with the connection (if there is one).
+    ///
+    /// The closure can resolve to a future which is resolved, but the result of
+    /// the future is ignored.
+    ///
+    /// A common think to do once the `SendAllFuture` is done is to quit
+    /// the connection, through for this `quit_on_completion` should be used.
+    /// Another possibility is that if you have a pool of connections the
+    /// closure will put the connection back into the pool it took it out
+    /// from to allow connection reuse.
+    //FIXME[futures/v>=0.2] use Never for IntoFuture futures Error
+    pub fn on_completion<F, ITF>(self, func: F) -> impl Stream<Item=(), Error=E>
+        where F: FnOnce(Option<Connection>) -> ITF, ITF: IntoFuture<Item=(), Error=()>
+    {
+        OnCompletion::new(self,|stream| {
+            let opt_con = stream.take_connection();
+            func(opt_con)
+        })
     }
 }
 
@@ -596,7 +623,6 @@ impl<I, E> Stream for SendAllMails<I>
 pub struct OnCompletion<S, F, UF> {
     stream: S,
     state: CompletionState<F, UF>
-    //_u: ::std::marker::PhantomData<U>
 }
 
 enum CompletionState<F, U> {
@@ -623,7 +649,7 @@ impl<F, U> CompletionState<F, U> {
 
 impl<S, F, U> OnCompletion<S, F, U::Future>
     //FIXME[futures/v>=0.2] Error=Never
-    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture
+    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture<Item=(), Error=()>
 {
     /// creates a new adapter calling func the first time the stream completes.
     ///
