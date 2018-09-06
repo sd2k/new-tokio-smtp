@@ -1,6 +1,6 @@
 //FIXME see if we can put this into Cargo.toml
 #[cfg(not(feature="mock-impl"))]
-compile_error!("integration tests require \"mock_impl\" feature");
+compile_error!("integration tests require \"mock-impl\" feature");
 
 #[macro_use]
 extern crate new_tokio_smtp;

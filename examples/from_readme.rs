@@ -7,7 +7,7 @@ extern crate rpassword;
 
 use std::io::{stdin, stdout, Write};
 
-use futures::stream::{self, Stream};
+use futures::stream::Stream;
 use futures::future::{lazy, Future};
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::{
@@ -26,10 +26,12 @@ struct Request {
 
 fn main() {
     let Request { config, mails } = read_request();
+    // We only have iter map overhead because we
+    // don't have a failable mail encoding step, which normally is required.
+    let mails = mails.into_iter().map(|m| -> Result<_, GeneralError> { Ok(m) });
 
     println!("[now starting tokio]");
     tokio::run(lazy(move || {
-        let mails = stream::iter_ok::<_, GeneralError>(mails);
         println!("[start connect_send_quit]");
         Connection::connect_send_quit(config, mails)
             .and_then(|results| {

@@ -56,7 +56,7 @@ extern crate rpassword;
 
 use std::io::{stdin, stdout, Write};
 
-use futures::stream::{self, Stream};
+use futures::stream::Stream;
 use futures::future::{lazy, Future};
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::{
@@ -69,16 +69,18 @@ use new_tokio_smtp::send_mail::{
 };
 
 struct Request {
-    config: ConnectionConfig<command::AuthPlain>,
+    config: ConnectionConfig<command::auth::Plain>,
     mails: Vec<MailEnvelop>
 }
 
 fn main() {
     let Request { config, mails } = read_request();
+    // We only have iter map overhead because we
+    // don't have a failable mail encoding step, which normally is required.
+    let mails = mails.into_iter().map(|m| -> Result<_, GeneralError> { Ok(m) });
 
     println!("[now starting tokio]");
     tokio::run(lazy(move || {
-        let mails = stream::iter_ok::<_, GeneralError>(mails);
         println!("[start connect_send_quit]");
         Connection::connect_send_quit(config, mails)
             .and_then(|results| {
@@ -100,7 +102,6 @@ fn main() {
     }))
 }
 
-
 fn read_request() -> Request {
 
     println!("preparing to send mail with ethereal.email");
@@ -111,7 +112,7 @@ fn read_request() -> Request {
         addr: "178.32.207.71:587".parse().unwrap(),
         security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
         client_id: ClientId::localhost(),
-        auth_cmd: command::AuthPlain::from_username(sender.clone(), passwd).unwrap()
+        auth_cmd: command::auth::Plain::from_username(sender.clone(), passwd).unwrap()
     };
 
     // the from_unchecked normally can be used if we know the address is valid
@@ -183,7 +184,7 @@ The library provides a number of usability helpers:
     the smtp libraries, but also libraries build on top of it more
     testable.
 
-3. `mock::MockStream` (use the features `mock_impl`)
+3. `mock::MockStream` (use the features `mock-impl`)
     A simple implementation for a `MockStream` which allows you
     to test which data was send to it and mock responses for it.
     (Through it's currently limited to a fixed predefined conversation,

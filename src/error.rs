@@ -9,8 +9,7 @@ use ::response::Response;
 pub enum GeneralError {
     Connecting(ConnectingFailed),
     Cmd(LogicError),
-    Connection(std_io::Error),
-    PreviousErrorKilledConnection
+    Io(std_io::Error)
 }
 
 impl Display for GeneralError {
@@ -19,15 +18,14 @@ impl Display for GeneralError {
         match *self {
             Connecting(ref err) => write!(fter, "Connecting failed: {}", err),
             Cmd(ref err) => write!(fter, "A command failed: {}", err),
-            Connection(ref err) => write!(fter, "Connection failed after connecting successfully: {}", err),
-            PreviousErrorKilledConnection => write!(fter, "A error previously in the operation/batch killed the connection")
+            Io(ref err) => write!(fter, "I/O-Error: {}", err),
         }
     }
 }
 
 impl From<std_io::Error> for GeneralError {
     fn from(err: std_io::Error) -> Self {
-        GeneralError::Connection(err)
+        GeneralError::Io(err)
     }
 }
 

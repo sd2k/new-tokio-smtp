@@ -12,6 +12,7 @@
 //! # #[macro_use] extern crate new_tokio_smtp;
 //! # #[macro_use] extern crate vec1;
 //! # use new_tokio_smtp::command;
+//! use std::iter::once as one;
 //! use futures::stream::{self, Stream};
 //! use futures::future::{self, lazy, Future};
 //! use new_tokio_smtp::error::GeneralError;
@@ -60,10 +61,12 @@
 //!         })
 //! }));
 //!
+//! // This is only overhead as we skipped any (fallible) mail encoding step
+//! let mail2: Result<_, GeneralError> = Ok(mail2);
 //! //or simpler (but with more verbose output)
 //! mock_run_with_tokio(lazy(move || {
-//!     let mails = stream::once(Result::Ok::<_, GeneralError>(mail2));
-//!     Connection::connect_send_quit(config2, mails)
+//!     // it accepts a iterator over mails,
+//!     Connection::connect_send_quit(config2, one(mail2))
 //!         .and_then(|results| {
 //!             results.for_each(|result| {
 //!                 if let Err(err) = result {
@@ -406,7 +409,7 @@ impl Connection {
         mails: M,
         //FIXME[futures/v>=2.0] use Never instead of ()
     ) -> SendAllMails<M>
-        where A: Cmd, E: From<GeneralError>, M: Stream<Item=MailEnvelop, Error=E>
+        where A: Cmd, E: From<GeneralError>, M: Iterator<Item=Result<MailEnvelop, E>>
     {
         SendAllMails::new(con, mails)
     }
@@ -442,15 +445,16 @@ impl Connection {
     /// ```no_run
     /// # extern crate futures;
     /// # extern crate new_tokio_smtp;
+    /// use std::iter::once as one;
     /// # use futures::{stream, Future, Stream};
     /// # use new_tokio_smtp::{Connection, ConnectionConfig, command};
     /// # use new_tokio_smtp::error::GeneralError;
     /// # use new_tokio_smtp::send_mail::MailEnvelop;
     /// # let config: ConnectionConfig<command::Noop> = unimplemented!();
-    /// # let mail_vec: Vec<MailEnvelop> = unimplemented!();
-    /// # let mails = ::futures::stream::iter_ok::<_, GeneralError>(mail_vec.into_iter());
+    /// # let mail: Result<MailEnvelop, GeneralError> = unimplemented!();
+    /// # // We only have this overhead as we skipped any (fallible) mail encoding process
     /// // note that the map_err is only needed as `!` isn't stable yet
-    /// let fut = Connection::connect_send_quit(config, mails)
+    /// let fut = Connection::connect_send_quit(config, one(mail))
     ///     .and_then(|results| results.collect().map_err(|_| unreachable!()));
     /// # let _ = fut;
     /// ```
@@ -464,12 +468,12 @@ impl Connection {
     /// which isn't what is expected/wanted at all.
     ///
     ///
-    pub fn connect_send_quit<A, E>(
+    pub fn connect_send_quit<A, E, I>(
         config: ConnectionConfig<A>,
-        mails: impl Stream<Item=MailEnvelop, Error=E>,
+        mails: I
         //FIXME[futures/v>=2.0] use Never instead of ()
     ) -> impl Future<Item=impl Stream<Item=Result<(), E>, Error=()>, Error=ConnectingFailed>
-        where A: Cmd, E: From<GeneralError>
+        where A: Cmd, E: From<GeneralError>, I: IntoIterator<Item=Result<MailEnvelop, E>>
     {
         let fut = Connection
             ::connect(config)
@@ -491,20 +495,22 @@ impl Connection {
 }
 
 /// adapter to send a stream of mails through a smtp connection
-pub struct SendAllMails<M> {
-    mails: M,
+pub struct SendAllMails<I> {
+    mails: I,
     con: Option<Connection>,
     //FIXME[rust/impl Trait in struct]
     pending: Option<Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>>,
 }
 
-impl<M> SendAllMails<M>
-    where M: Stream<Item=MailEnvelop>, M::Error: From<GeneralError>
+impl<I, E> SendAllMails<I>
+    where I: Iterator<Item=Result<MailEnvelop, E>>, E: From<GeneralError>
 {
     /// create a new `SendAllMails` stream adapter
-    pub fn new(con: Connection, mails: M) -> Self {
+    pub fn new<V>(con: Connection, mails: V) -> Self
+        where V: IntoIterator<IntoIter=I, Item=Result<MailEnvelop, E>>
+    {
         SendAllMails {
-            mails,
+            mails: mails.into_iter(),
             con: Some(con),
             pending: None,
         }
@@ -532,10 +538,10 @@ impl<M> SendAllMails<M>
     }
 }
 
-impl<M> Stream for SendAllMails<M>
-    where M: Stream<Item=MailEnvelop>, M::Error: From<GeneralError>
+impl<I, E> Stream for SendAllMails<I>
+    where I: Iterator<Item=Result<MailEnvelop, E>>, E: From<GeneralError>
 {
-    type Item=Result<(), M::Error>;
+    type Item=Result<(), E>;
     //FIXME[futures/v>=0.2] use Never
     type Error=();
 
@@ -551,30 +557,32 @@ impl<M> Stream for SendAllMails<M>
                     Ok(Async::Ready((con, result))) => {
                         self.con = Some(con);
                         let result = result.map_err(|(_idx, logic_err)| {
-                            M::Error::from(GeneralError::from(logic_err))
+                            E::from(GeneralError::from(logic_err))
                         });
                         Ok(Async::Ready(Some(result)))
                     },
                     Err(io_error) => {
-                        let err = M::Error::from(GeneralError::from(io_error));
+                        let err = E::from(GeneralError::from(io_error));
                         Ok(Async::Ready(Some(Err(err))))
                     }
                 };
             }
 
-            return match self.mails.poll() {
-                Ok(Async::NotReady) => Ok(Async::NotReady),
-                Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
-                Ok(Async::Ready(Some(mail))) => {
+            return match self.mails.next() {
+                None => Ok(Async::Ready(None)),
+                Some(Ok(mail)) => {
                     if let Some(con) = self.con.take() {
                         self.pending = Some(Box::new(con.send_mail(mail)));
                         continue;
                     } else {
-                        let err = M::Error::from(GeneralError::PreviousErrorKilledConnection);
+                        let err = E::from(GeneralError::Io(std_io::Error::new(
+                            std_io::ErrorKind::NotConnected,
+                            "previous error killed connection"
+                        )));
                         Ok(Async::Ready(Some(Err(err))))
                     }
                 },
-                Err(err) => {
+                Some(Err(err)) => {
                     Ok(Async::Ready(Some(Err(err))))
                 }
             };
@@ -695,8 +703,7 @@ mod test {
     #[allow(unused)]
     fn assert_send_in_send_out() {
         let config: ConnectionConfig<command::Noop> = unimplemented!();
-        let mail_vec: Vec<MailEnvelop> = unimplemented!();
-        let mails = ::futures::stream::iter_ok::<_, GeneralError>(mail_vec.into_iter());
+        let mails: Vec<Result<MailEnvelop, GeneralError>> = unimplemented!();
         assert_send(&mails);
         let fut = Connection::connect_send_quit(config, mails);
         assert_send(&fut);

@@ -20,7 +20,7 @@
 //! enabled a `send_mail` command is added `Connection` which combines the steps
 //! of sending the `MAIL` command, the `RCPT` command and the `DATA` command.
 //!
-//! ## `mock_support`, `mock_impl`
+//! ## `mock-support`, `mock-impl`
 //!
 //! Extend the `Socket` abstraction to include a mock socket additional to `Tcp`, `TcpTls`.
 //! Also provides a mock socket implementation for simply testing commands. Custom implementations
