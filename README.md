@@ -276,3 +276,14 @@ Change Log
   - added connection builder for local non secure connections
   - addec constructors for builders on types they build
   - renamed `auth::plain::NullCodePoint` to `auth::plain::NullCodePointError`
+
+- `v0.7`
+  - `send_all_mails` and `connect_send_quit` now accept a `IntoIterable` instead of stream
+    - you need to have all values already ready when sending so `Stream` didn't fit well
+    - it also means you can now pass in a `Vec` or a `std::iter:once`
+  - `GeneralError` as no longer the `PreviousRequestKilledConnection` error variant instead
+    a `std::io::Error::new(std::io::ErrorKind::NoConnection, "...")` is returned which makes
+    it easier to adapt to by libraries using it and fit the semantics as good as previous
+    solution
+  - `send_all_mails` and `connect_send_quit` now return a stream instead of a future resolving
+    to a stream.
