@@ -57,7 +57,7 @@ extern crate rpassword;
 use std::io::{stdin, stdout, Write};
 
 use futures::stream::Stream;
-use futures::future::{lazy, Future};
+use futures::future::lazy;
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::{
     command, Connection, ConnectionConfig,
@@ -83,24 +83,19 @@ fn main() {
     tokio::run(lazy(move || {
         println!("[start connect_send_quit]");
         Connection::connect_send_quit(config, mails)
-            .and_then(|results| {
-                results.for_each(|result| {
-                    if let Err(err) = result {
-                        println!("[sending mail failed]: {}", err);
-                    } else {
-                        println!("[successfully send mail]")
-                    }
-                    Ok(())
-                })
-                // will be gone once `!` is stable
-                .map_err(|_| unreachable!())
-            })
-            .or_else(|conerr| {
-                println!("[connecting failed]: {}", conerr);
+            //Stream::for_each is design wise broken in futures v0.1
+            .then(|result| Ok(result))
+            .for_each(|result| {
+                if let Err(err) = result {
+                    println!("[sending mail failed]: {}", err);
+                } else {
+                    println!("[successfully send mail]")
+                }
                 Ok(())
             })
     }))
 }
+
 
 fn read_request() -> Request {
 

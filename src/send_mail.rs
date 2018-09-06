@@ -67,20 +67,14 @@
 //! mock_run_with_tokio(lazy(move || {
 //!     // it accepts a iterator over mails,
 //!     Connection::connect_send_quit(config2, one(mail2))
-//!         .and_then(|results| {
-//!             results.for_each(|result| {
-//!                 if let Err(err) = result {
-//!                     println!("sending mail failed: {}", err);
-//!                 } else {
-//!                     println!("successfully send mail")
-//!                 }
-//!                 Ok(())
-//!             })
-//!             // will be gone once `!` is stable
-//!             .map_err(|_| unreachable!())
-//!         })
-//!         .or_else(|conerr| {
-//!             println!("connecting failed: {}", conerr);
+//!         //Stream::for_each is conceptually broken in futures v0.1
+//!         .then(|res| Ok(res))
+//!         .for_each(|result| {
+//!             if let Err(err) = result {
+//!                 println!("sending mail failed: {}", err);
+//!             } else {
+//!                 println!("successfully send mail")
+//!             }
 //!             Ok(())
 //!         })
 //! }));
@@ -103,7 +97,7 @@ use vec1::Vec1;
 use ::{Cmd, Connection};
 use ::error::{
     LogicError, MissingCapabilities,
-    GeneralError, ConnectingFailed
+    GeneralError
 };
 use ::chain::{chain, OnError, HandleErrorInChain};
 use ::data_types::{ReversePath, ForwardPath};
@@ -402,6 +396,7 @@ impl Connection {
     /// sends all mails from mails through the connection
     ///
     /// The connection is moved into the `SendAllMails` adapter
+    //TODO quit_on_what??
     /// and can be retrieved from there. Alternatively `quit_on_completion`
     /// can be used to make the adapter call quite once all mails are send.
     pub fn send_all_mails<A, E, M>(
@@ -455,7 +450,9 @@ impl Connection {
     /// # // We only have this overhead as we skipped any (fallible) mail encoding process
     /// // note that the map_err is only needed as `!` isn't stable yet
     /// let fut = Connection::connect_send_quit(config, one(mail))
-    ///     .and_then(|results| results.collect().map_err(|_| unreachable!()));
+    ///     //Stream::collect is conceptually broken in futures v0.1
+    ///     .then(|res| Result::Ok::<_, ()>(res))
+    ///     .collect();
     /// # let _ = fut;
     /// ```
     ///
@@ -471,24 +468,28 @@ impl Connection {
     pub fn connect_send_quit<A, E, I>(
         config: ConnectionConfig<A>,
         mails: I
-        //FIXME[futures/v>=2.0] use Never instead of ()
-    ) -> impl Future<Item=impl Stream<Item=Result<(), E>, Error=()>, Error=ConnectingFailed>
+    ) -> impl Stream<Item=(), Error=E>
         where A: Cmd, E: From<GeneralError>, I: IntoIterator<Item=Result<MailEnvelop, E>>
     {
         let fut = Connection
             ::connect(config)
-            .map(|con| {
-                OnCompletion::new(
-                    SendAllMails::new(con, mails),
-                    |send_adapter| {
-                        if let Some(con) = send_adapter.take_connection() {
-                            Either::A(con.quit().map(|_|()))
-                        } else {
-                            Either::B(future::ok(()))
+            .then(|res| match res {
+                Err(err) => Err(E::from(GeneralError::from(err))),
+                Ok(con) => {
+                    Ok(OnCompletion::new(
+                        SendAllMails::new(con, mails),
+                        |send_adapter| {
+                            if let Some(con) = send_adapter.take_connection() {
+                                Either::A(con.quit().map(|_|()))
+                            } else {
+                                Either::B(future::ok(()))
+                            }
                         }
-                    }
-                )
-            });
+                    ))
+                }
+            })
+            .into_stream()
+            .flatten();
 
         fut
     }
@@ -541,9 +542,8 @@ impl<I, E> SendAllMails<I>
 impl<I, E> Stream for SendAllMails<I>
     where I: Iterator<Item=Result<MailEnvelop, E>>, E: From<GeneralError>
 {
-    type Item=Result<(), E>;
-    //FIXME[futures/v>=0.2] use Never
-    type Error=();
+    type Item=();
+    type Error=E;
 
     //FIXME[futures/async streams]
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -556,14 +556,13 @@ impl<I, E> Stream for SendAllMails<I>
                     },
                     Ok(Async::Ready((con, result))) => {
                         self.con = Some(con);
-                        let result = result.map_err(|(_idx, logic_err)| {
-                            E::from(GeneralError::from(logic_err))
-                        });
-                        Ok(Async::Ready(Some(result)))
+                        match result {
+                            Ok(res) => Ok(Async::Ready(Some(res))),
+                            Err((_idx, err)) => Err(E::from(GeneralError::from(err)))
+                        }
                     },
                     Err(io_error) => {
-                        let err = E::from(GeneralError::from(io_error));
-                        Ok(Async::Ready(Some(Err(err))))
+                        Err(E::from(GeneralError::from(io_error)))
                     }
                 };
             }
@@ -575,16 +574,13 @@ impl<I, E> Stream for SendAllMails<I>
                         self.pending = Some(Box::new(con.send_mail(mail)));
                         continue;
                     } else {
-                        let err = E::from(GeneralError::Io(std_io::Error::new(
+                        Err(E::from(GeneralError::Io(std_io::Error::new(
                             std_io::ErrorKind::NotConnected,
                             "previous error killed connection"
-                        )));
-                        Ok(Async::Ready(Some(Err(err))))
+                        ))))
                     }
                 },
-                Some(Err(err)) => {
-                    Ok(Async::Ready(Some(Err(err))))
-                }
+                Some(Err(err)) => Err(err)
             };
 
         }
