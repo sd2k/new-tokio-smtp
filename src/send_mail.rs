@@ -63,7 +63,8 @@
 //!
 //! // This is only overhead as we skipped any (fallible) mail encoding step
 //! let mail2: Result<_, GeneralError> = Ok(mail2);
-//! //or simpler (but with more verbose output)
+//!
+//! //or simpler
 //! mock_run_with_tokio(lazy(move || {
 //!     // it accepts a iterator over mails,
 //!     Connection::connect_send_quit(config2, one(mail2))
@@ -392,11 +393,18 @@ impl Connection {
         send_mail(self, envelop, OnError::StopAndReset)
     }
 
-    /// sends all mails from mails through the connection
+    /// Sends all mails from mails through the connection.
     ///
     /// The connection is moved into the `SendAllMails` adapter
-    /// and can be retrieved from there. Alternatively `quit_on_completion`
-    /// can be used to make the adapter call quite once all mails are send.
+    /// and can be retrieved from there.
+    ///
+    /// Alternatively `SendAllMails.quit_on_completion`
+    /// can be used to make the adapter call quite once
+    /// all mails are send.
+    ///
+    /// Or `SendAllMails.on_completion` can be used if
+    /// you need to do something else with the same connection
+    /// (like putting it back into a connection pool).
     pub fn send_all_mails<A, E, M>(
         con: Connection,
         mails: M,
@@ -407,18 +415,20 @@ impl Connection {
         SendAllMails::new(con, mails)
     }
 
-    /// creates a new connection, sends all mails and then closes the connection
+    /// Creates a new connection, sends all mails and then closes the connection
     ///
     /// - if sending a mail fails because of `LogicError` it will still try to send the other mails.
     /// - If sending a mail fails because of an I/O-Error causing the connection to be lost the remaining
-    ///   Mails will fail with `GeneralError::PreviousErrorKilledConnection`.
+    ///   Mails will fail with `GeneralError::Io` with an `std::io::ErrorKind::NoConnection` error.
     ///
-    /// This function will poll first open a connection _then_ poll mails from the
-    /// `mail` stream sending them through the connection and then close the
-    /// connection. As some mail servers cut off unused connections it might
-    /// be a good idea to make sure all mails are available when the connection
-    /// is opened, i.e. to make sure polling `mails` doesn't have to wait long,
-    /// through if this is necessary depends on the mail server/provider.
+    /// This function accepts an `IntoIterable` (instead of a `Stream`) as all mails
+    /// should already be available when the connection os opened.
+    /// It also expects `Result`'s instead of just mails, as mails normally have to
+    /// be encoded which can fail (and is not part of the crate). With this its easier
+    /// to adapt it to functionality which e.g. takes a vector of data and creates and
+    /// sends mails from it returning a vector of results. Be aware of `std::iter::once`
+    /// which provides a handy way to just pass in a single mail envelop.
+    ///
     ///
     /// As any future/stream this has to be polled to drive it to completion,
     /// i.e. even if you don't care about the results you have to poll the
@@ -428,11 +438,18 @@ impl Connection {
     ///
     /// Take a look at the `send_mail` module documentation for an usage example.
     ///
-    /// To send a number of mails from a vec you can use:
+    /// To send a single mail `std::iter::once as one` can be used:
     ///
-    /// `Connection::connect_send_quit(config, stream::iter_ok::<_, GeneralError>(vec_of_mails))`
+    /// `Connection::connect_send_quit(config, one(mail))`
     ///
     /// To get back a `Vec` of results you can use:
+    ///
+    /// `stream.then(|result| Ok(result)).collect()`
+    ///
+    /// Which is only needed as `futures v0.1` `Stream::collect` method is
+    /// conceptually broken. (`Stream`'s are a sequence of results in futures,
+    /// which continuos independent of any error result, but `collect` is written
+    /// as if streams short circuit once a error is it which is just wrong.)
     ///
     /// ```no_run
     /// # extern crate futures;
@@ -452,15 +469,6 @@ impl Connection {
     ///     .collect();
     /// # let _ = fut;
     /// ```
-    ///
-    /// # Design Note
-    ///
-    /// Note that the implementation intentionally returns a `Item=Result<_,_>, Error=()`
-    /// instead of an `Item=_, Error=_` as some combinators do not play well with cases
-    /// where the stream represents a sequence of results instead of a sequence of items
-    /// where the stream can fail. E.g. `collect` would discard thinks if any mail failed,
-    /// which isn't what is expected/wanted at all.
-    ///
     ///
     pub fn connect_send_quit<A, E, I>(
         config: ConnectionConfig<A>,
@@ -482,7 +490,7 @@ impl Connection {
     }
 }
 
-/// adapter to send a stream of mails through a smtp connection
+/// Adapter to send all mails from an iterable instance through a smtp connection.
 pub struct SendAllMails<I> {
     mails: I,
     con: Option<Connection>,
@@ -614,7 +622,7 @@ impl<I, E> Stream for SendAllMails<I>
     }
 }
 
-/// stream adapt resolving one function/future after the stream completes
+/// Stream adapt resolving one function/future after the stream completes
 ///
 /// If `S` is fused calling the stream adapter after completion is fine,
 /// through the function will only run the time it completes. I.e. if
