@@ -100,6 +100,7 @@ use ::error::{
     LogicError, MissingCapabilities,
     GeneralError
 };
+use ::common::SetupTls;
 use ::chain::{chain, OnError, HandleErrorInChain};
 use ::data_types::{ReversePath, ForwardPath};
 use ::command::{self, params_with_smtputf8};
@@ -405,12 +406,12 @@ impl Connection {
     /// Or `SendAllMails.on_completion` can be used if
     /// you need to do something else with the same connection
     /// (like putting it back into a connection pool).
-    pub fn send_all_mails<A, E, M>(
+    pub fn send_all_mails<E, M>(
         con: Connection,
         mails: M,
         //FIXME[futures/v>=2.0] use Never instead of ()
     ) -> SendAllMails<M>
-        where A: Cmd, E: From<GeneralError>, M: Iterator<Item=Result<MailEnvelop, E>>
+        where E: From<GeneralError>, M: Iterator<Item=Result<MailEnvelop, E>>
     {
         SendAllMails::new(con, mails)
     }
@@ -470,11 +471,14 @@ impl Connection {
     /// # let _ = fut;
     /// ```
     ///
-    pub fn connect_send_quit<A, E, I>(
-        config: ConnectionConfig<A>,
+    pub fn connect_send_quit<A, E, I, T>(
+        config: ConnectionConfig<A, T>,
         mails: I
     ) -> impl Stream<Item=(), Error=E>
-        where A: Cmd, E: From<GeneralError>, I: IntoIterator<Item=Result<MailEnvelop, E>>
+        where A: Cmd,
+              E: From<GeneralError>,
+              I: IntoIterator<Item=Result<MailEnvelop, E>>,
+              T: SetupTls
     {
         let fut = Connection
             ::connect(config)
