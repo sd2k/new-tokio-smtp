@@ -2,7 +2,7 @@ use std::{io as std_io};
 use std::net::SocketAddr;
 
 use futures::future::{self, Map, Either, Future};
-use tokio::net::{TcpStream, ConnectFuture};
+use tokio::net::tcp::{TcpStream, ConnectFuture};
 use tokio_tls::TlsConnectorExt;
 use native_tls::TlsConnector;
 
