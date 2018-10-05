@@ -287,3 +287,7 @@ Change Log
     solution
   - `send_all_mails` and `connect_send_quit` now return a stream instead of a future resolving
     to a stream.
+
+- `v0.7.1`
+  - updated dependencies, makes sure tokio doesn't produces a deprecation warning
+    as a import moved to a different place in tokio
