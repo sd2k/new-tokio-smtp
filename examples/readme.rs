@@ -10,10 +10,7 @@ use std::io::{stdin, stdout, Write};
 use futures::stream::Stream;
 use futures::future::lazy;
 use new_tokio_smtp::error::GeneralError;
-use new_tokio_smtp::{
-    command, Connection, ConnectionConfig,
-    Security, ClientId, Domain
-};
+use new_tokio_smtp::{command, Connection, ConnectionConfig, Domain};
 use new_tokio_smtp::send_mail::{
     Mail, EncodingRequirement,
     MailAddress, MailEnvelop,
@@ -54,12 +51,13 @@ fn read_request() -> Request {
     let sender = read_email();
     let passwd = read_password();
 
-    let config: ConnectionConfig<_> = ConnectionConfig {
-        addr: "178.32.207.71:587".parse().unwrap(),
-        security: Security::StartTls(Domain::from_unchecked("ethereal.email").into()),
-        client_id: ClientId::localhost(),
-        auth_cmd: command::auth::Plain::from_username(sender.clone(), passwd).unwrap()
-    };
+    // The `from_unchecked` will turn into a `.parse()` in the future.
+    let config = ConnectionConfig
+        ::build(Domain::from_unchecked("smtp.ethereal.email"))
+            .expect("resolving domain failed")
+        .auth(command::auth::Plain::from_username(sender.clone(), passwd)
+            .expect("username/password can not contain \\0 bytes"))
+        .build();
 
     // the from_unchecked normally can be used if we know the address is valid
     // a mail address parser will be added at some point in the future
