@@ -53,7 +53,7 @@ fn read_request() -> Request {
 
     // The `from_unchecked` will turn into a `.parse()` in the future.
     let config = ConnectionConfig
-        ::build(Domain::from_unchecked("smtp.ethereal.email"))
+        ::builder(Domain::from_unchecked("smtp.ethereal.email"))
             .expect("resolving domain failed")
         .auth(command::auth::Plain::from_username(sender.clone(), passwd)
             .expect("username/password can not contain \\0 bytes"))

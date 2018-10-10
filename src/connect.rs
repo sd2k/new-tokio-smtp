@@ -258,7 +258,7 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
     ///
     /// While this is possible **it is not a good idea use this
     /// for anything but test setups**.
-    pub fn build_local_unencrypted() -> LocalNonSecureBuilder<Noop> {
+    pub fn builder_local_unencrypted() -> LocalNonSecureBuilder<Noop> {
         LocalNonSecureBuilder {
             client_id: None,
             port: DEFAULT_SMTP_MSA_PORT,
@@ -266,19 +266,19 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
         }
     }
 
-    pub fn build(host: Domain)
+    pub fn builder(host: Domain)
         -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
     {
         ConnectionBuilder::new(host)
     }
 
-    pub fn build_with_port(host: Domain, port: u16)
+    pub fn builder_with_port(host: Domain, port: u16)
         -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
     {
         ConnectionBuilder::new_with_port(host, port)
     }
 
-    pub fn build_with_addr(addr: SocketAddr, domain: Domain)
+    pub fn builder_with_addr(addr: SocketAddr, domain: Domain)
         -> ConnectionBuilder<Noop, DefaultTlsSetup>
     {
         ConnectionBuilder::new_with_addr(addr, domain)
