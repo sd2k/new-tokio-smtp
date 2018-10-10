@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 
 use futures::future::{self, Map, Either, Future};
 use tokio::net::tcp::{TcpStream, ConnectFuture};
-use tokio_tls::TlsConnectorExt;
-use native_tls::TlsConnector;
+use tokio_tls::TlsConnector;
+use native_tls::TlsConnector as NativeTlsConnector;
 
 use ::common::{map_tls_err, SetupTls, TlsConfig};
 use super::Io;
@@ -13,7 +13,6 @@ use super::Io;
 impl Io {
 
     /// create a new Tcp only connection to the given address
-    //FIXME[rust/impl Trait]: use -> impl Future<Item=Io, Error=std_io::Error>
     pub fn connect_insecure(addr: &SocketAddr) -> Map<ConnectFuture, fn(TcpStream) -> Io> {
         let fut = TcpStream
             ::connect(addr)
@@ -30,7 +29,8 @@ impl Io {
         let TlsConfig { domain, setup } = config;
         let connector = alttry!(
             {
-                setup.setup(TlsConnector::builder()?)
+                let contor = setup.setup(NativeTlsConnector::builder())?;
+                Ok(TlsConnector::from(contor))
             } =>
             |err| Either::B(future::err(map_tls_err(err)))
         );
@@ -38,7 +38,7 @@ impl Io {
         let fut = TcpStream
             ::connect(&addr)
             .and_then(move |stream| connector
-                .connect_async(domain.as_str(), stream)
+                .connect(domain.as_str(), stream)
                 .map_err(map_tls_err)
             )
             .map(Io::from);

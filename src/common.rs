@@ -3,7 +3,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::fmt::Debug;
 use std::collections::HashMap;
 
-use native_tls::{self, TlsConnectorBuilder, TlsConnector};
+use native_tls::{
+    self,
+    TlsConnectorBuilder,
+    TlsConnector as NativeTlsConnector
+};
 use hostname::get_hostname;
 
 
@@ -132,7 +136,8 @@ impl From<Domain> for TlsConfig {
 pub trait SetupTls: Debug + Send + 'static {
 
     /// Accepts a connection builder and returns a connector if possible
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>;
+    fn setup(self, builder: TlsConnectorBuilder)
+        -> Result<NativeTlsConnector, native_tls::Error>;
 }
 
 /// The default tls setup, which just calls `builder.build()`
@@ -140,15 +145,18 @@ pub trait SetupTls: Debug + Send + 'static {
 pub struct DefaultTlsSetup;
 
 impl SetupTls for DefaultTlsSetup {
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
+    fn setup(self, builder: TlsConnectorBuilder)
+        -> Result<NativeTlsConnector, native_tls::Error>
+    {
         builder.build()
     }
 }
 
 impl<F: 'static> SetupTls for F
-    where F: Send + Debug + FnOnce(TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error>
+    where F: Send + Debug + FnOnce(TlsConnectorBuilder)
+    -> Result<NativeTlsConnector, native_tls::Error>
 {
-    fn setup(self, builder: TlsConnectorBuilder) -> Result<TlsConnector, native_tls::Error> {
+    fn setup(self, builder: TlsConnectorBuilder) -> Result<NativeTlsConnector, native_tls::Error> {
         (self)(builder)
     }
 }

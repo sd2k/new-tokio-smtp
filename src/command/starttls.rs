@@ -2,8 +2,8 @@ use std::{io as std_io};
 
 use futures::future::{self, Either, Future};
 
-use native_tls::TlsConnector;
-use tokio_tls::TlsConnectorExt;
+use native_tls::TlsConnector as NativeTlsConnector;
+use tokio_tls::TlsConnector;
 
 use ::error::MissingCapabilities;
 use ::{
@@ -126,7 +126,8 @@ impl<S> Cmd for StartTls<S>
                 Ok(_) => {
                     let connector = alttry!(
                         {
-                            setup_tls.setup(TlsConnector::builder()?)
+                            let contor = setup_tls.setup(NativeTlsConnector::builder())?;
+                            Ok(TlsConnector::from(contor))
                         } =>
                         |err| Either::A(future::err(map_tls_err(err)))
                     );
@@ -138,7 +139,7 @@ impl<S> Cmd for StartTls<S>
                     };
 
                     let fut = connector
-                        .connect_async(sni_domain.as_str(), stream)
+                        .connect(sni_domain.as_str(), stream)
                         .map_err(map_tls_err)
                         .map(move |stream| {
                             let socket = Socket::Secure(stream);
