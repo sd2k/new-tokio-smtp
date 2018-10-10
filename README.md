@@ -289,3 +289,7 @@ Change Log
 - `v0.7.1`
   - updated dependencies, makes sure tokio doesn't produces a deprecation warning
     as a import moved to a different place in tokio
+
+- `v0.8.0`
+  - update `tokio-tls`/`native-tls` to v0.2.x
+  - renamed method creating a builder from `build*` to `builder*`
