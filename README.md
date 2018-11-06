@@ -293,3 +293,12 @@ Change Log
 - `v0.8.0`
   - update `tokio-tls`/`native-tls` to v0.2.x
   - renamed method creating a builder from `build*` to `builder*`
+
+- `v0.8.1`
+  - `SelectCmd` and `EitherCmd` where added
+
+
+Contributors
+-------------
+
+- katyo (https://github.com/katyo)
