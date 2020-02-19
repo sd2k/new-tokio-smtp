@@ -208,7 +208,7 @@ impl EsmtpKeyword {
             let mut iter = val.as_ref().chars();
             iter.next()
                 .map(|ch| ch.is_ascii_alphanumeric()).unwrap_or(false)
-                && iter.all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+                && iter.all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '=')
         };
 
         if valid {
