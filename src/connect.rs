@@ -254,7 +254,7 @@ impl<A> ConnectionConfig<A, DefaultTlsSetup>
 
 impl ConnectionConfig<Noop, DefaultTlsSetup> {
 
-    /// Creates a connection to `127.0.01` without any form of encryption.
+    /// Creates a connection to `127.0.0.1` without any form of encryption.
     ///
     /// While this is possible **it is not a good idea use this
     /// for anything but test setups**.
