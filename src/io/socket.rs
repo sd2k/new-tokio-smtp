@@ -1,10 +1,10 @@
-use std::io as std_io;
 use std::fmt::Debug;
+use std::io as std_io;
 
-use futures::Poll;
 use bytes::buf::{Buf, BufMut};
-use tokio::net::TcpStream;
+use futures::Poll;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpStream;
 use tokio_tls::TlsStream;
 
 /// Abstraction over Tcp, TcpTls (and Mock)
@@ -22,32 +22,31 @@ use tokio_tls::TlsStream;
 pub enum Socket {
     Secure(TlsStream<TcpStream>),
     Insecure(TcpStream),
-    #[cfg(feature="mock-support")]
-    Mock(Box<MockStream + Send>)
+    #[cfg(feature = "mock-support")]
+    Mock(Box<MockStream + Send>),
 }
 
 impl Socket {
-
     /// true if it's a `TlsStream` (or if mock says so)
     pub fn is_secure(&self) -> bool {
         match *self {
             Socket::Secure(_) => true,
             Socket::Insecure(_) => false,
-            #[cfg(feature="mock-support")]
-            Socket::Mock(ref mock) => mock.is_secure()
+            #[cfg(feature = "mock-support")]
+            Socket::Mock(ref mock) => mock.is_secure(),
         }
     }
 }
 
 macro_rules! socket_mux {
-    ($self:ident, |$socket:ident| $block:block) => ({
+    ($self:ident, |$socket:ident| $block:block) => {{
         match *$self {
             Socket::Secure(ref mut $socket) => $block,
             Socket::Insecure(ref mut $socket) => $block,
-            #[cfg(feature="mock-support")]
-            Socket::Mock(ref mut $socket) => $block
+            #[cfg(feature = "mock-support")]
+            Socket::Mock(ref mut $socket) => $block,
         }
-    });
+    }};
 }
 
 impl std_io::Read for Socket {
@@ -78,8 +77,8 @@ impl AsyncRead for Socket {
         match *self {
             Socket::Secure(ref socket) => socket.prepare_uninitialized_buffer(buf),
             Socket::Insecure(ref socket) => socket.prepare_uninitialized_buffer(buf),
-            #[cfg(feature="mock-support")]
-            Socket::Mock(ref socket) => socket.prepare_uninitialized_buffer(buf)
+            #[cfg(feature = "mock-support")]
+            Socket::Mock(ref socket) => socket.prepare_uninitialized_buffer(buf),
         }
     }
 
@@ -92,7 +91,8 @@ impl AsyncRead for Socket {
 
     #[inline]
     fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, std_io::Error>
-        where Self: Sized,
+    where
+        Self: Sized,
     {
         socket_mux! {self, |socket| {
             socket.read_buf(buf)
@@ -120,7 +120,8 @@ impl AsyncWrite for Socket {
     }
 
     fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, std_io::Error>
-        where Self: Sized,
+    where
+        Self: Sized,
     {
         socket_mux! {self, |socket| {
             AsyncWrite::write_buf(socket, buf)

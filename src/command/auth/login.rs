@@ -1,20 +1,19 @@
-use futures::future::{self, Either, Future};
 use base64::encode;
+use futures::future::{self, Either, Future};
 
-use ::future_ext::ResultWithContextExt;
-use ::{ExecFuture, Cmd, Io, EhloData};
-use ::error::{LogicError, MissingCapabilities};
 use super::validate_auth_capability;
+use error::{LogicError, MissingCapabilities};
+use future_ext::ResultWithContextExt;
+use {Cmd, EhloData, ExecFuture, Io};
 
 /// Simple implementation of AUTH LOGIN for smtp.
 #[derive(Debug, Clone)]
 pub struct Login {
     username: String,
-    password: String
+    password: String,
 }
 
 impl Login {
-
     /// Create a new auth login command based on username and password.
     pub fn new(username: &str, password: &str) -> Self {
         Login {
@@ -34,15 +33,10 @@ impl Login {
     }
 
     //intentionally no base64_password!
-
 }
 
-
 impl Cmd for Login {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         validate_auth_capability(caps, "LOGIN")
     }
 
@@ -67,6 +61,5 @@ impl Cmd for Login {
             });
 
         Box::new(fut)
-
     }
 }

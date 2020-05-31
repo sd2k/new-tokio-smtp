@@ -1,31 +1,30 @@
 extern crate futures;
-extern crate tokio;
 extern crate new_tokio_smtp;
+extern crate tokio;
 #[macro_use]
 extern crate vec1;
 extern crate rpassword;
 
 use std::io::{stdin, stdout, Write};
 
-use futures::stream::Stream;
 use futures::future::lazy;
+use futures::stream::Stream;
 use new_tokio_smtp::error::GeneralError;
+use new_tokio_smtp::send_mail::{EncodingRequirement, Mail, MailAddress, MailEnvelop};
 use new_tokio_smtp::{command, Connection, ConnectionConfig, Domain};
-use new_tokio_smtp::send_mail::{
-    Mail, EncodingRequirement,
-    MailAddress, MailEnvelop,
-};
 
 struct Request {
     config: ConnectionConfig<command::auth::Plain>,
-    mails: Vec<MailEnvelop>
+    mails: Vec<MailEnvelop>,
 }
 
 fn main() {
     let Request { config, mails } = read_request();
     // We only have iter map overhead because we
     // don't have a failable mail encoding step, which normally is required.
-    let mails = mails.into_iter().map(|m| -> Result<_, GeneralError> { Ok(m) });
+    let mails = mails
+        .into_iter()
+        .map(|m| -> Result<_, GeneralError> { Ok(m) });
 
     println!("[now starting tokio]");
     tokio::run(lazy(move || {
@@ -44,19 +43,18 @@ fn main() {
     }))
 }
 
-
 fn read_request() -> Request {
-
     println!("preparing to send mail with ethereal.email");
     let sender = read_email();
     let passwd = read_password();
 
     // The `from_unchecked` will turn into a `.parse()` in the future.
-    let config = ConnectionConfig
-        ::builder(Domain::from_unchecked("smtp.ethereal.email"))
-            .expect("resolving domain failed")
-        .auth(command::auth::Plain::from_username(sender.clone(), passwd)
-            .expect("username/password can not contain \\0 bytes"))
+    let config = ConnectionConfig::builder(Domain::from_unchecked("smtp.ethereal.email"))
+        .expect("resolving domain failed")
+        .auth(
+            command::auth::Plain::from_username(sender.clone(), passwd)
+                .expect("username/password can not contain \\0 bytes"),
+        )
         .build();
 
     // the from_unchecked normally can be used if we know the address is valid
@@ -67,33 +65,40 @@ fn read_request() -> Request {
     // REALLY BAD IDEA there are a ton of ways
     // this can go wrong, so don't do this in
     // practice, use some library to crate mails
-    let raw_mail = format!(concat!(
-        "Date: Thu, 14 Jun 2018 11:22:18 +0000\r\n",
-        "From: You <{}>\r\n",
-        //ethereal doesn't delivers any mail so it's fine
-        "To: Invalid <{}>\r\n",
-        "Subject: I am spam?\r\n",
-        "\r\n",
-        "...\r\n"
-    ), sender.as_str(), send_to.as_str());
+    let raw_mail = format!(
+        concat!(
+            "Date: Thu, 14 Jun 2018 11:22:18 +0000\r\n",
+            "From: You <{}>\r\n",
+            //ethereal doesn't delivers any mail so it's fine
+            "To: Invalid <{}>\r\n",
+            "Subject: I am spam?\r\n",
+            "\r\n",
+            "...\r\n"
+        ),
+        sender.as_str(),
+        send_to.as_str()
+    );
 
     // this normally adapts to a higher level abstraction
     // of mail then this crate provides
     let mail_data = Mail::new(EncodingRequirement::None, raw_mail.to_owned());
 
-    let mail = MailEnvelop::new(sender, vec1![ send_to ], mail_data);
+    let mail = MailEnvelop::new(sender, vec1![send_to], mail_data);
 
     Request {
         config,
-        mails: vec![ mail ]
+        mails: vec![mail],
     }
 }
 
 fn read_email() -> MailAddress {
     let stdout = stdout();
     let mut handle = stdout.lock();
-    write!(handle, "enter ethereal.email mail address\n[Note mail is not validated in this example]: ")
-        .unwrap();
+    write!(
+        handle,
+        "enter ethereal.email mail address\n[Note mail is not validated in this example]: "
+    )
+    .unwrap();
     handle.flush().unwrap();
 
     let mut line = String::new();

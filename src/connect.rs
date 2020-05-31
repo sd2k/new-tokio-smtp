@@ -1,89 +1,82 @@
-use std::net::{SocketAddr, ToSocketAddrs, Ipv4Addr};
-use std::{io as std_io};
 use std::fmt::Debug;
+use std::io as std_io;
+use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs};
 
-use futures::future::{self, Future, Either};
+use futures::future::{self, Either, Future};
 
-use ::future_ext::ResultWithContextExt;
-use ::error::{
-    ConnectingFailed,
-    LogicError
-};
-use ::data_types::Domain;
-use ::common::{
-    TlsConfig, SetupTls,
-    ClientId, DefaultTlsSetup
-};
-use ::io::{Io, SmtpResult};
-use ::connection::{
-    Connection, Cmd
-};
+use common::{ClientId, DefaultTlsSetup, SetupTls, TlsConfig};
+use connection::{Cmd, Connection};
+use data_types::Domain;
+use error::{ConnectingFailed, LogicError};
+use future_ext::ResultWithContextExt;
+use io::{Io, SmtpResult};
 //NOTE: out-of-order (potential circular) dep, but ok in this case
-use ::command::Noop;
+use command::Noop;
 
 /// A future resolving to an `Connection` instance
-pub type ConnectingFuture = Box<Future<Item=Connection, Error=ConnectingFailed> + Send + 'static>;
+pub type ConnectingFuture =
+    Box<Future<Item = Connection, Error = ConnectingFailed> + Send + 'static>;
 
 pub const DEFAULT_SMTP_MSA_PORT: u16 = 587;
 pub const DEFAULT_SMTP_MX_PORT: u16 = 25;
 
 fn cmd_future2connecting_future<LE: 'static, E>(
     res: Result<(Connection, SmtpResult), E>,
-    new_logic_err: LE
-) -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    where LE: Send + FnOnce(LogicError) -> ConnectingFailed,
-          E: Into<ConnectingFailed>
+    new_logic_err: LE,
+) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
+where
+    LE: Send + FnOnce(LogicError) -> ConnectingFailed,
+    E: Into<ConnectingFailed>,
 {
-    let fut =
-        match res {
-            Err(err) => Either::A(future::err(err.into())),
-            Ok((con, Ok(_resp))) => Either::A(future::ok(con.into())),
-            Ok((con, Err(err))) => {
-                Either::B(con.quit().then(|_| Err(new_logic_err(err))))
-            }
-        };
+    let fut = match res {
+        Err(err) => Either::A(future::err(err.into())),
+        Ok((con, Ok(_resp))) => Either::A(future::ok(con.into())),
+        Ok((con, Err(err))) => Either::B(con.quit().then(|_| Err(new_logic_err(err)))),
+    };
 
     fut
 }
 
-
 impl Connection {
-
     /// open a connection to an smtp server using given configuration
-    pub fn connect<S, A>(config: ConnectionConfig<A, S>)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-        where S: SetupTls, A: Cmd + Send
+    pub fn connect<S, A>(
+        config: ConnectionConfig<A, S>,
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
+    where
+        S: SetupTls,
+        A: Cmd + Send,
     {
-        let ConnectionConfig { addr, security, client_id, auth_cmd } = config;
+        let ConnectionConfig {
+            addr,
+            security,
+            client_id,
+            auth_cmd,
+        } = config;
 
         #[allow(deprecated)]
         let con_fut = match security {
-            Security::None => {
-                Either::B(Either::A(Connection::_connect_insecure(&addr, client_id)))
-            },
-            Security::DirectTls(tls_config) => {
-                Either::B(Either::B(Connection::_connect_direct_tls(&addr, client_id, tls_config)))
-            }
+            Security::None => Either::B(Either::A(Connection::_connect_insecure(&addr, client_id))),
+            Security::DirectTls(tls_config) => Either::B(Either::B(
+                Connection::_connect_direct_tls(&addr, client_id, tls_config),
+            )),
             Security::StartTls(tls_config) => {
                 Either::A(Connection::_connect_starttls(&addr, client_id, tls_config))
             }
         };
 
-        let fut = con_fut
-            .and_then(|con| con
-                .send(auth_cmd)
+        let fut = con_fut.and_then(|con| {
+            con.send(auth_cmd)
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
-            );
+        });
 
         fut
     }
 
     #[doc(hidden)]
-    pub fn _connect_insecure_no_ehlo(addr: &SocketAddr)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    {
-        let fut = Io
-            ::connect_insecure(addr)
+    pub fn _connect_insecure_no_ehlo(
+        addr: &SocketAddr,
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
+        let fut = Io::connect_insecure(addr)
             .and_then(Io::parse_response)
             .then(|res| {
                 let res = res.map(|(io, res)| (Connection::from(io), res));
@@ -94,12 +87,14 @@ impl Connection {
     }
 
     #[doc(hidden)]
-    pub fn _connect_direct_tls_no_ehlo<S>(addr: &SocketAddr, config: TlsConfig<S>)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-        where S: SetupTls
+    pub fn _connect_direct_tls_no_ehlo<S>(
+        addr: &SocketAddr,
+        config: TlsConfig<S>,
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
+    where
+        S: SetupTls,
     {
-        let fut = Io
-            ::connect_secure(addr, config)
+        let fut = Io::connect_secure(addr, config)
             .and_then(Io::parse_response)
             .then(|res| {
                 let res = res.map(|(io, res)| (Connection::from(io), res));
@@ -110,19 +105,17 @@ impl Connection {
     }
 
     #[doc(hidden)]
-    pub fn _connect_insecure(addr: &SocketAddr, clid: ClientId)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    {
+    pub fn _connect_insecure(
+        addr: &SocketAddr,
+        clid: ClientId,
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
-        let fut = Connection
-            ::_connect_insecure_no_ehlo(addr)
-            .and_then(|con| con
-                .send(Ehlo::from(clid))
+        let fut = Connection::_connect_insecure_no_ehlo(addr).and_then(|con| {
+            con.send(Ehlo::from(clid))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
-            );
-
+        });
 
         fut
     }
@@ -132,18 +125,17 @@ impl Connection {
         addr: &SocketAddr,
         clid: ClientId,
         config: TlsConfig<S>,
-    ) -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-        where S: SetupTls
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
+    where
+        S: SetupTls,
     {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Ehlo;
-        let fut = Connection
-            ::_connect_direct_tls_no_ehlo(addr, config)
-            .and_then(|con| con
-                .send(Ehlo::from(clid))
+        let fut = Connection::_connect_direct_tls_no_ehlo(addr, config).and_then(|con| {
+            con.send(Ehlo::from(clid))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
-            );
+        });
 
         fut
     }
@@ -152,29 +144,25 @@ impl Connection {
     pub fn _connect_starttls<S>(
         addr: &SocketAddr,
         clid: ClientId,
-        config: TlsConfig<S>
-    )
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-        where S: SetupTls
+        config: TlsConfig<S>,
+    ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
+    where
+        S: SetupTls,
     {
         //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::{StartTls, Ehlo};
+        use command::{Ehlo, StartTls};
         let TlsConfig { domain, setup } = config;
 
-        let fut = Connection
-            ::_connect_insecure(&addr, clid.clone())
-            .and_then(|con| con
-                .send(StartTls {
+        let fut = Connection::_connect_insecure(&addr, clid.clone())
+            .and_then(|con| {
+                con.send(StartTls {
                     setup_tls: setup,
-                    sni_domain: domain
+                    sni_domain: domain,
                 })
                 .map_err(ConnectingFailed::Io)
-            )
-            .ctx_and_then(|con, _| con
-                .send(Ehlo::from(clid))
-                .map_err(ConnectingFailed::Io)
-            )
+            })
+            .ctx_and_then(|con, _| con.send(Ehlo::from(clid)).map_err(ConnectingFailed::Io))
             .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup));
 
         fut
@@ -184,17 +172,19 @@ impl Connection {
 /// configure what kind of security is used
 #[derive(Debug, Clone, PartialEq)]
 pub enum Security<S>
-    where S: SetupTls
+where
+    S: SetupTls,
 {
     /// use a plain non encrypted connection
     #[deprecated(
-        since="0.0",
-        note="it's strongly discourage to use unencrypted connections for private information/auth etc.")]
+        since = "0.0",
+        note = "it's strongly discourage to use unencrypted connections for private information/auth etc."
+    )]
     None,
     /// directly connect with TCP-TLS to smtp server
     DirectTls(TlsConfig<S>),
     /// connect with just TCP and then start TLS with the STARTTLS command
-    StartTls(TlsConfig<S>)
+    StartTls(TlsConfig<S>),
 }
 
 /// Configuration specifing how to setup an SMTP connection.
@@ -224,7 +214,9 @@ pub enum Security<S>
 /// ```
 #[derive(Debug, Clone)]
 pub struct ConnectionConfig<A, S = DefaultTlsSetup>
-    where S: SetupTls, A: Cmd
+where
+    S: SetupTls,
+    A: Cmd,
 {
     /// the address and port to connect to (i.e. the ones of the smtp server)
     pub addr: SocketAddr,
@@ -237,17 +229,15 @@ pub struct ConnectionConfig<A, S = DefaultTlsSetup>
     /// This is relevant for the communication between smtp server, through
     /// for connecting to an MSA (e.g. thunderbird connecting to gmail)
     /// using localhost (`[127.0.0.1]`) is enough
-    pub client_id: ClientId
+    pub client_id: ClientId,
 }
 
-
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
-    where A: Cmd
+where
+    A: Cmd,
 {
     /// Calls `Connection::connect(self)`.
-    pub fn connect(self)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    {
+    pub fn connect(self) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         Connection::connect(self)
     }
 }
@@ -262,25 +252,27 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
         LocalNonSecureBuilder {
             client_id: None,
             port: DEFAULT_SMTP_MSA_PORT,
-            auth_cmd: Noop
+            auth_cmd: Noop,
         }
     }
 
-    pub fn builder(host: Domain)
-        -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
-    {
+    pub fn builder(
+        host: Domain,
+    ) -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error> {
         ConnectionBuilder::new(host)
     }
 
-    pub fn builder_with_port(host: Domain, port: u16)
-        -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error>
-    {
+    pub fn builder_with_port(
+        host: Domain,
+        port: u16,
+    ) -> Result<ConnectionBuilder<Noop, DefaultTlsSetup>, std_io::Error> {
         ConnectionBuilder::new_with_port(host, port)
     }
 
-    pub fn builder_with_addr(addr: SocketAddr, domain: Domain)
-        -> ConnectionBuilder<Noop, DefaultTlsSetup>
-    {
+    pub fn builder_with_addr(
+        addr: SocketAddr,
+        domain: Domain,
+    ) -> ConnectionBuilder<Noop, DefaultTlsSetup> {
         ConnectionBuilder::new_with_addr(addr, domain)
     }
 }
@@ -290,15 +282,17 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
 /// **Should only be used for test setups**
 #[derive(Debug)]
 pub struct LocalNonSecureBuilder<A>
-    where A: Cmd
+where
+    A: Cmd,
 {
     client_id: Option<ClientId>,
     port: u16,
-    auth_cmd: A
+    auth_cmd: A,
 }
 
 impl<A> LocalNonSecureBuilder<A>
-    where A: Cmd
+where
+    A: Cmd,
 {
     /// overrides the port to use (default: `DEFAULT_SMTP_MSA_PORT`)
     pub fn port(mut self, port: u16) -> Self {
@@ -314,59 +308,67 @@ impl<A> LocalNonSecureBuilder<A>
 
     /// sets the auth command to use (default no authentication)
     pub fn auth<NA>(self, auth_cmd: NA) -> LocalNonSecureBuilder<NA>
-        where NA: Cmd
+    where
+        NA: Cmd,
     {
         let LocalNonSecureBuilder {
-            client_id, port, auth_cmd:_
+            client_id,
+            port,
+            auth_cmd: _,
         } = self;
 
         LocalNonSecureBuilder {
-            client_id, port, auth_cmd
+            client_id,
+            port,
+            auth_cmd,
         }
     }
 
     // builds the connection config
     pub fn build(self) -> ConnectionConfig<A, DefaultTlsSetup> {
         let LocalNonSecureBuilder {
-            client_id, port, auth_cmd
+            client_id,
+            port,
+            auth_cmd,
         } = self;
 
-        let client_id = client_id
-            .unwrap_or_else(||ClientId::hostname());
+        let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
 
-        let addr = SocketAddr::new(Ipv4Addr::new(127,0,0,1).into(), port);
+        let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), port);
 
         #[allow(deprecated)]
         let security = Security::None;
 
-        ConnectionConfig { addr, client_id, auth_cmd, security }
+        ConnectionConfig {
+            addr,
+            client_id,
+            auth_cmd,
+            security,
+        }
     }
 
     /// Calls `Connection::connect(self.build())`.
-    pub fn connect(self)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    {
+    pub fn connect(self) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         Connection::connect(self.build())
     }
 }
 
-
 /// Builder for an `ConnectionConfig` for a encrypted smtp connection.
 #[derive(Debug)]
 pub struct ConnectionBuilder<A, S = DefaultTlsSetup>
-    where S: SetupTls, A: Cmd
+where
+    S: SetupTls,
+    A: Cmd,
 {
     client_id: Option<ClientId>,
     addr: SocketAddr,
     domain: Domain,
     setup_tls: S,
     use_security: UseSecurity,
-    auth_cmd: A
+    auth_cmd: A,
 }
 
 impl ConnectionBuilder<Noop, DefaultTlsSetup> {
-
-
     /// Create a new `ConnectionBuilder` based on a domain name/host name.
     ///
     /// The used port will be `DEFAULT_SMTP_MSA_PORT` i.e. 587.
@@ -409,14 +411,15 @@ impl ConnectionBuilder<Noop, DefaultTlsSetup> {
             use_security: UseSecurity::StartTls,
             client_id: None,
             setup_tls: DefaultTlsSetup,
-            auth_cmd: Noop
+            auth_cmd: Noop,
         }
     }
-
 }
 
 impl<A, S> ConnectionBuilder<A, S>
-    where S: SetupTls, A: Cmd
+where
+    S: SetupTls,
+    A: Cmd,
 {
     /// Use a different `TlsSetup` implementation.
     ///
@@ -431,13 +434,21 @@ impl<A, S> ConnectionBuilder<A, S>
     ///
     pub fn use_tls_setup<S2: SetupTls>(self, setup: S2) -> ConnectionBuilder<A, S2> {
         let ConnectionBuilder {
-            addr, domain, use_security,
-            client_id, setup_tls:_, auth_cmd
+            addr,
+            domain,
+            use_security,
+            client_id,
+            setup_tls: _,
+            auth_cmd,
         } = self;
 
         ConnectionBuilder {
-            addr, domain, use_security,
-            client_id, setup_tls: setup, auth_cmd
+            addr,
+            domain,
+            use_security,
+            client_id,
+            setup_tls: setup,
+            auth_cmd,
         }
     }
 
@@ -472,13 +483,21 @@ impl<A, S> ConnectionBuilder<A, S>
     /// i.e. no authentication is done.
     pub fn auth<NA: Cmd>(self, auth_cmd: NA) -> ConnectionBuilder<NA, S> {
         let ConnectionBuilder {
-            addr, domain, use_security,
-            client_id, setup_tls, auth_cmd:_
+            addr,
+            domain,
+            use_security,
+            client_id,
+            setup_tls,
+            auth_cmd: _,
         } = self;
 
         ConnectionBuilder {
-            addr, domain, use_security,
-            client_id, setup_tls, auth_cmd: auth_cmd
+            addr,
+            domain,
+            use_security,
+            client_id,
+            setup_tls,
+            auth_cmd: auth_cmd,
         }
     }
 
@@ -489,7 +508,6 @@ impl<A, S> ConnectionBuilder<A, S>
         self.client_id = Some(id);
         self
     }
-
 
     /// Creates a new connection config.
     ///
@@ -502,51 +520,57 @@ impl<A, S> ConnectionBuilder<A, S>
     ///
     pub fn build(self) -> ConnectionConfig<A, S> {
         let ConnectionBuilder {
-            addr, domain, use_security,
-            client_id, setup_tls: setup, auth_cmd
+            addr,
+            domain,
+            use_security,
+            client_id,
+            setup_tls: setup,
+            auth_cmd,
         } = self;
 
         let tls_config = TlsConfig { domain, setup };
-        let security =
-            match use_security {
-                UseSecurity::StartTls => Security::StartTls(tls_config),
-                UseSecurity::DirectTls => Security::DirectTls(tls_config)
-            };
+        let security = match use_security {
+            UseSecurity::StartTls => Security::StartTls(tls_config),
+            UseSecurity::DirectTls => Security::DirectTls(tls_config),
+        };
 
         let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
 
         ConnectionConfig {
-            addr, security, auth_cmd, client_id
+            addr,
+            security,
+            auth_cmd,
+            client_id,
         }
     }
 
     /// Calls `Connection::connect(self.build())`.
-    pub fn connect(self)
-        -> impl Future<Item=Connection, Error=ConnectingFailed> + Send
-    {
+    pub fn connect(self) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         Connection::connect(self.build())
     }
 }
 
-
 #[derive(Debug)]
 enum UseSecurity {
-    StartTls, DirectTls
+    StartTls,
+    DirectTls,
 }
 
 fn get_addr(tsas: impl ToSocketAddrs + Copy + Debug) -> Result<SocketAddr, std_io::Error> {
     if let Some(addr) = tsas.to_socket_addrs()?.next() {
         Ok(addr)
     } else {
-        Err(std_io::Error::new(std_io::ErrorKind::AddrNotAvailable,
-            format!("{:?} is not associated with any socket address", tsas)))
+        Err(std_io::Error::new(
+            std_io::ErrorKind::AddrNotAvailable,
+            format!("{:?} is not associated with any socket address", tsas),
+        ))
     }
 }
 
 #[cfg(test)]
 mod testd {
-    use hostname::get_hostname;
     use super::*;
+    use hostname::get_hostname;
 
     //this domain has to exist
     const EXAMPLE_DOMAIN: &str = "1aim.com";
@@ -558,23 +582,26 @@ mod testd {
         let cb = ConnectionBuilder::new(host.clone()).unwrap();
 
         let ConnectionConfig {
-            addr, security, auth_cmd, client_id
+            addr,
+            security,
+            auth_cmd,
+            client_id,
         } = cb.build();
 
-        assert!(
-            (EXAMPLE_DOMAIN, DEFAULT_SMTP_MSA_PORT)
+        assert!((EXAMPLE_DOMAIN, DEFAULT_SMTP_MSA_PORT)
             .to_socket_addrs()
             .unwrap()
-            .any(|other_addr| other_addr == addr)
+            .any(|other_addr| other_addr == addr));
+        assert_eq!(
+            security,
+            Security::StartTls(TlsConfig {
+                domain: host,
+                setup: DefaultTlsSetup
+            })
         );
-        assert_eq!(security, Security::StartTls(TlsConfig {
-            domain: host,
-            setup: DefaultTlsSetup
-        }));
         let _type_check: Noop = auth_cmd;
         if let ClientId::Domain(domain) = client_id {
-            let expected_client_id = get_hostname()
-                .unwrap_or_else(|| "localhost".to_owned());
+            let expected_client_id = get_hostname().unwrap_or_else(|| "localhost".to_owned());
             assert_eq!(domain.as_str(), &expected_client_id)
         } else {
             panic!("unexpected client id: {:?}", client_id);

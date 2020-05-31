@@ -1,14 +1,14 @@
-use std::{io as std_io};
+use std::io as std_io;
 
-use futures::future::{self, Future, Either};
+use futures::future::{self, Either, Future};
 use tokio::io::{shutdown, Shutdown};
 
-use ::common::EhloData;
-use ::error::{LogicError, MissingCapabilities};
-use ::io::{Io, SmtpResult, Socket};
+use common::EhloData;
+use error::{LogicError, MissingCapabilities};
+use io::{Io, SmtpResult, Socket};
 
 /// future returned by `Cmd::exec`
-pub type ExecFuture = Box<Future<Item=(Io, SmtpResult), Error=std_io::Error> + Send + 'static>;
+pub type ExecFuture = Box<Future<Item = (Io, SmtpResult), Error = std_io::Error> + Send + 'static>;
 
 /// The basic `Connection` type representing an (likely) open smtp connection
 ///
@@ -23,12 +23,10 @@ pub type ExecFuture = Box<Future<Item=(Io, SmtpResult), Error=std_io::Error> + S
 /// of it are mainly for implementor of the `Cmd` trait.
 #[derive(Debug)]
 pub struct Connection {
-    io: Io
+    io: Io,
 }
 
-
 impl Connection {
-
     /// send a command to the smtp server
     ///
     /// This consumes the connection (as it might be modified, recrated or
@@ -107,17 +105,21 @@ impl Connection {
     /// If the connection fails (e.g. the internet connection is interrupted)
     /// the future will resolve to an `io::Error` and the connection is gone.
     ///
-    pub fn send<C: Cmd>(self, cmd: C)
-        -> impl Future<Item=(Connection, SmtpResult), Error=std_io::Error>
-    {
-        let fut =
-            if let Err(err) = cmd.check_cmd_availability(self.io.ehlo_data()) {
-                Either::B(future::ok((self, Err(LogicError::MissingCapabilities(err)))))
-            } else {
-                Either::A(cmd
-                    .exec(self.into())
-                    .map(|(io, smtp_res)| (Connection::from(io), smtp_res)))
-            };
+    pub fn send<C: Cmd>(
+        self,
+        cmd: C,
+    ) -> impl Future<Item = (Connection, SmtpResult), Error = std_io::Error> {
+        let fut = if let Err(err) = cmd.check_cmd_availability(self.io.ehlo_data()) {
+            Either::B(future::ok((
+                self,
+                Err(LogicError::MissingCapabilities(err)),
+            )))
+        } else {
+            Either::A(
+                cmd.exec(self.into())
+                    .map(|(io, smtp_res)| (Connection::from(io), smtp_res)),
+            )
+        };
 
         fut
     }
@@ -131,7 +133,8 @@ impl Connection {
     /// If the connection has no ehlo data or the capability is not in the ehlo
     /// data false is returned.
     pub fn has_capability<C>(&self, cap: C) -> bool
-        where C: AsRef<str>
+    where
+        C: AsRef<str>,
     {
         self.io.has_capability(cap)
     }
@@ -161,7 +164,7 @@ impl Connection {
     /// The socked is shut down independent of wether or not sending
     /// quit failed, while sending quit should not cause any logic
     /// error if it does it's not returned by this method.
-    pub fn quit(self) -> impl Future<Item=Socket, Error=std_io::Error> {
+    pub fn quit(self) -> impl Future<Item = Socket, Error = std_io::Error> {
         //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use command::Quit;
@@ -187,7 +190,6 @@ impl From<Connection> for Io {
     }
 }
 
-
 /// create a new `Connection` from a `Socket` instance
 ///
 /// The `Socket` instance _should_ contain a socket which
@@ -199,18 +201,15 @@ impl From<Socket> for Connection {
     }
 }
 
-
 /// Trait implemented by any smtp command
 ///
 /// While it is not object safe on itself using
 /// `cmd.boxed()` provides something very similar
 /// to trait object.
 pub trait Cmd: Send + 'static {
-
     /// This method is used to verify if the command can be used
     /// for a given connection
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>;
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities>;
 
     /// Executes this command on the given connection
     ///
@@ -231,7 +230,8 @@ pub trait Cmd: Send + 'static {
     /// if you would normally use a `Cmd` trait object.
     /// (e.g. to but a number of cmd's in a `Vec`)
     fn boxed(self) -> BoxedCmd
-        where Self: Sized + 'static
+    where
+        Self: Sized + 'static,
     {
         Box::new(Some(self))
     }
@@ -250,14 +250,12 @@ pub type BoxedCmd = Box<TypeErasableCmd + Send>;
 /// are used directly. **So just ignore this trait**
 ///
 pub trait TypeErasableCmd {
-
     /// # Panics
     ///
     /// may panic if called after `_only_once_exec` was
     /// called
     #[doc(hidden)]
-    fn _check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>;
+    fn _check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities>;
 
     /// # Panics
     ///
@@ -270,12 +268,13 @@ pub trait TypeErasableCmd {
 
 #[doc(hidden)]
 impl<C> TypeErasableCmd for Option<C>
-    where C: Cmd
+where
+    C: Cmd,
 {
-    fn _check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
-        let me = self.as_ref().expect("_check_cmd_availability called after _only_onece_exec");
+    fn _check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
+        let me = self
+            .as_ref()
+            .expect("_check_cmd_availability called after _only_onece_exec");
         me.check_cmd_availability(caps)
     }
 
@@ -286,10 +285,7 @@ impl<C> TypeErasableCmd for Option<C>
 }
 
 impl Cmd for BoxedCmd {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         self._check_cmd_availability(caps)
     }
 

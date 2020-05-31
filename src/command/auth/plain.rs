@@ -1,11 +1,11 @@
+use std::error::Error as ErrorTrait;
 use std::fmt::{self, Display};
 use std::sync::Arc;
-use std::error::{Error as ErrorTrait};
 
 use base64::encode;
 
-use ::{ExecFuture, Cmd, EhloData, Io};
-use ::error::MissingCapabilities;
+use error::MissingCapabilities;
+use {Cmd, EhloData, ExecFuture, Io};
 
 use super::validate_auth_capability;
 
@@ -14,14 +14,15 @@ use super::validate_auth_capability;
 pub struct Plain {
     authorization_identity: String,
     authentication_identity: String,
-    password: String
+    password: String,
 }
 
 impl Plain {
-
     /// Create a auth plain command from a given username and password.
     pub fn from_username<I1, I2>(user: I1, password: I2) -> Result<Self, NullCodePointError>
-        where I1: Into<String> + AsRef<str>, I2: Into<String> + AsRef<str>
+    where
+        I1: Into<String> + AsRef<str>,
+        I2: Into<String> + AsRef<str>,
     {
         validate_no_null_cps(&user)?;
         validate_no_null_cps(&password)?;
@@ -30,7 +31,7 @@ impl Plain {
         Ok(Plain {
             authentication_identity: user.clone(),
             authorization_identity: user,
-            password: password.into()
+            password: password.into(),
         })
     }
 
@@ -38,14 +39,15 @@ impl Plain {
     ///
     /// Most times authorization and authentication identities are the same (and happen to be
     /// the username) in which case `auth::Plain::from_username` can be used.
-    pub fn new<I1,I2,I3>(
+    pub fn new<I1, I2, I3>(
         authorization_identity: I1,
         authentication_identity: I2,
-        password: I3
+        password: I3,
     ) -> Result<Self, NullCodePointError>
-        where I1: Into<String> + AsRef<str>,
-              I2: Into<String> + AsRef<str>,
-              I3: Into<String> + AsRef<str>
+    where
+        I1: Into<String> + AsRef<str>,
+        I2: Into<String> + AsRef<str>,
+        I3: Into<String> + AsRef<str>,
     {
         validate_no_null_cps(&authorization_identity)?;
         validate_no_null_cps(&authentication_identity)?;
@@ -54,7 +56,7 @@ impl Plain {
         Ok(Plain {
             authentication_identity: authentication_identity.into(),
             authorization_identity: authorization_identity.into(),
-            password: password.into()
+            password: password.into(),
         })
     }
 
@@ -71,20 +73,17 @@ impl Plain {
     //intentionally no fn password(&self)!
 
     fn exec_ref(&self, io: Io) -> ExecFuture {
-        let auth_str = encode(&format!("{}\0{}\0{}",
-                               &self.authorization_identity,
-                               &self.authentication_identity,
-                               &self.password));
+        let auth_str = encode(&format!(
+            "{}\0{}\0{}",
+            &self.authorization_identity, &self.authentication_identity, &self.password
+        ));
 
         io.exec_simple_cmd(&["AUTH PLAIN ", auth_str.as_str()])
     }
 }
 
 impl Cmd for Plain {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         validate_auth_capability(caps, "PLAIN")
     }
 
@@ -94,10 +93,7 @@ impl Cmd for Plain {
 }
 
 impl Cmd for Arc<Plain> {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         let me: &Plain = &*self;
         me.check_cmd_availability(caps)
     }
@@ -108,11 +104,12 @@ impl Cmd for Arc<Plain> {
 }
 
 fn validate_no_null_cps<R>(inp: R) -> Result<(), NullCodePointError>
-    where R: AsRef<str>
+where
+    R: AsRef<str>,
 {
     for bch in inp.as_ref().bytes() {
         if bch == b'\0' {
-            return Err(NullCodePointError)
+            return Err(NullCodePointError);
         }
     }
     Ok(())

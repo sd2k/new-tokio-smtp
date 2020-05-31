@@ -1,21 +1,17 @@
-use std::{io as std_io};
+use std::io as std_io;
 
 use futures::future::{self, Either, Future};
 
 use native_tls::TlsConnector as NativeTlsConnector;
 use tokio_tls::TlsConnector;
 
-use ::error::MissingCapabilities;
-use ::{
-    ExecFuture, Cmd,
-    Domain, Capability, EsmtpKeyword,
-    map_tls_err, SetupTls, DefaultTlsSetup, EhloData
+use error::MissingCapabilities;
+use io::{Io, Socket};
+use response::{codes, Response};
+use {
+    map_tls_err, Capability, Cmd, DefaultTlsSetup, Domain, EhloData, EsmtpKeyword, ExecFuture,
+    SetupTls,
 };
-use ::io::{Io, Socket};
-use ::response::{Response, codes};
-
-
-
 
 pub struct StartTls<S = DefaultTlsSetup> {
     pub setup_tls: S,
@@ -24,21 +20,23 @@ pub struct StartTls<S = DefaultTlsSetup> {
 
 impl StartTls<DefaultTlsSetup> {
     pub fn new<I>(sni_domain: I) -> Self
-        where I: Into<Domain>
+    where
+        I: Into<Domain>,
     {
         StartTls {
             sni_domain: sni_domain.into(),
-            setup_tls: DefaultTlsSetup
+            setup_tls: DefaultTlsSetup,
         }
     }
 }
 
 impl<S> StartTls<S>
-    where S: SetupTls
+where
+    S: SetupTls,
 {
-
     pub fn new_with_tls_setup<I, F: 'static>(sni_domain: I, setup_tls: S) -> Self
-        where I: Into<Domain>
+    where
+        I: Into<Domain>,
     {
         StartTls {
             setup_tls,
@@ -52,17 +50,13 @@ impl<S> StartTls<S>
 /// after that nothing is ever send back, but this API _always_ has a
 /// response for a request, so we create a "fake" response (`"220 Ready"`)
 fn tls_done_result() -> Response {
-    Response::new(
-        codes::STATUS_RESPONSE,
-        vec![ "Ready".to_owned() ]
-    )
+    Response::new(codes::STATUS_RESPONSE, vec!["Ready".to_owned()])
 }
-
 
 fn connection_already_secure_error_future() -> ExecFuture {
     let fut = future::err(std_io::Error::new(
         std_io::ErrorKind::AlreadyExists,
-        "connection is already TLS encrypted"
+        "connection is already TLS encrypted",
     ));
     return Box::new(fut);
 }
@@ -70,46 +64,45 @@ fn connection_already_secure_error_future() -> ExecFuture {
 const STARTTLS: &str = "STARTTLS";
 
 impl<S> Cmd for StartTls<S>
-    where S: SetupTls
+where
+    S: SetupTls,
 {
-
-    fn check_cmd_availability(&self, caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         caps.and_then(|ehlo_data| {
             if ehlo_data.has_capability(STARTTLS) {
                 Some(())
             } else {
                 None
             }
-        }).ok_or_else(|| {
+        })
+        .ok_or_else(|| {
             let mcap = Capability::from(EsmtpKeyword::from_unchecked(STARTTLS));
             MissingCapabilities::new(vec![mcap])
         })
     }
 
     fn exec(self, mut io: Io) -> ExecFuture {
-        let StartTls { sni_domain, setup_tls } = self;
+        let StartTls {
+            sni_domain,
+            setup_tls,
+        } = self;
 
-        let was_mock =
-            match *io.socket_mut() {
-                Socket::Insecure(_) => {
-                    false
-                },
-                #[cfg(feature="mock-support")]
-                Socket::Mock(ref mut socket_mock) if !socket_mock.is_secure() => {
-                    socket_mock.set_is_secure(true);
-                    true
-                }
-                #[cfg(feature="mock-support")]
-                Socket::Secure(_) | Socket::Mock(_) => {
-                    return connection_already_secure_error_future();
-                }
-                #[cfg(not(feature="mock-support"))]
-                Socket::Secure(_) => {
-                    return connection_already_secure_error_future();
-                },
-            };
+        let was_mock = match *io.socket_mut() {
+            Socket::Insecure(_) => false,
+            #[cfg(feature = "mock-support")]
+            Socket::Mock(ref mut socket_mock) if !socket_mock.is_secure() => {
+                socket_mock.set_is_secure(true);
+                true
+            }
+            #[cfg(feature = "mock-support")]
+            Socket::Secure(_) | Socket::Mock(_) => {
+                return connection_already_secure_error_future();
+            }
+            #[cfg(not(feature = "mock-support"))]
+            Socket::Secure(_) => {
+                return connection_already_secure_error_future();
+            }
+        };
 
         if was_mock {
             let fut = future::ok((io, Ok(tls_done_result())));
@@ -120,9 +113,7 @@ impl<S> Cmd for StartTls<S>
             .flush_line_from_parts(&["STARTTLS"])
             .and_then(Io::parse_response)
             .and_then(move |(io, smtp_result)| match smtp_result {
-                Err(response) => {
-                    Either::A(future::ok((io, Err(response))))
-                },
+                Err(response) => Either::A(future::ok((io, Err(response)))),
                 Ok(_) => {
                     let connector = alttry!(
                         {
@@ -135,7 +126,7 @@ impl<S> Cmd for StartTls<S>
                     let (socket, _buffer, _ehlo_data) = io.split();
                     let stream = match socket {
                         Socket::Insecure(stream) => stream,
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     };
 
                     let fut = connector
@@ -148,7 +139,7 @@ impl<S> Cmd for StartTls<S>
                         });
 
                     Either::B(fut)
-                },
+                }
             });
 
         Box::new(fut)

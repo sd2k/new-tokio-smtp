@@ -1,10 +1,10 @@
-use std::convert::AsRef;
 use std::borrow::Borrow;
-use std::str::FromStr;
-use std::fmt::{self, Display};
+use std::convert::AsRef;
 use std::error::Error;
+use std::fmt::{self, Display};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
+use std::str::FromStr;
 
 use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
@@ -21,7 +21,6 @@ impl Deref for Capability {
 }
 
 impl Borrow<IgnoreAsciiCaseStr> for Capability {
-
     fn borrow(&self) -> &IgnoreAsciiCaseStr {
         (self.0).0.as_ref()
     }
@@ -152,15 +151,17 @@ macro_rules! impl_str_wrapper {
     )*);
 }
 
-
 impl_str_wrapper!(
-    Domain, EhloParam, AddressLiteral, EsmtpKeyword, EsmtpValue,
-    ForwardPath, ReversePath
+    Domain,
+    EhloParam,
+    AddressLiteral,
+    EsmtpKeyword,
+    EsmtpValue,
+    ForwardPath,
+    ReversePath
 );
 
-
 impl ReversePath {
-
     /// creates an empty reverse path
     ///
     /// In a mail command this will lead to `"MAIL FROM:<>"`.
@@ -182,9 +183,7 @@ impl FromStr for EhloParam {
     type Err = SyntaxError;
 
     fn from_str(inp: &str) -> Result<Self, Self::Err> {
-        let valid = inp.bytes().all(|bch| {
-            33 <= bch && bch <= 126
-        });
+        let valid = inp.bytes().all(|bch| 33 <= bch && bch <= 126);
 
         if valid {
             Ok(EhloParam(inp.to_owned().into()))
@@ -195,19 +194,20 @@ impl FromStr for EhloParam {
 }
 
 impl EsmtpKeyword {
-
     /// create a new `EsmtpKeyword` from a string
     ///
     /// This validates the input, possible creating a
     /// syntax error. Alternatively `"string".parse()`
     /// can be used as `EsmtpKeyword` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
-        where I: AsRef<str> + Into<String>
+    where
+        I: AsRef<str> + Into<String>,
     {
         let valid = {
             let mut iter = val.as_ref().chars();
             iter.next()
-                .map(|ch| ch.is_ascii_alphanumeric()).unwrap_or(false)
+                .map(|ch| ch.is_ascii_alphanumeric())
+                .unwrap_or(false)
                 && iter.all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
         };
 
@@ -230,18 +230,19 @@ impl FromStr for EsmtpKeyword {
 }
 
 impl EsmtpValue {
-
-     /// create a new `EsmtpValue` from a string
+    /// create a new `EsmtpValue` from a string
     ///
     /// This validates the input, possible creating a
     /// syntax error. Alternatively `"string".parse()`
     /// can be used as `EsmtpValue` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
-        where I: AsRef<str> + Into<String>
+    where
+        I: AsRef<str> + Into<String>,
     {
-        let valid = val.as_ref().bytes().all(|bch| {
-            33 <= bch && (bch <= 60 || (62 <= bch && bch <= 128))
-        });
+        let valid = val
+            .as_ref()
+            .bytes()
+            .all(|bch| 33 <= bch && (bch <= 60 || (62 <= bch && bch <= 128)));
 
         if valid {
             let sfyied: String = val.into();
@@ -269,7 +270,6 @@ impl FromStr for Capability {
 }
 
 impl Domain {
-
     /// creates a new domain without validating it's correctness
     pub fn new_unchecked(domain: String) -> Self {
         Domain(domain.into())
@@ -295,7 +295,9 @@ fn validate_subdomain(inp: &str) -> bool {
     let binp = inp.as_bytes();
     len > 1
         && binp[0].is_ascii_alphanumeric()
-        && binp[1..len-1].iter().all(|bch| bch.is_ascii_alphanumeric() || *bch == b'-' )
+        && binp[1..len - 1]
+            .iter()
+            .all(|bch| bch.is_ascii_alphanumeric() || *bch == b'-')
         && binp[len - 1].is_ascii_alphanumeric()
 }
 
@@ -309,7 +311,6 @@ pub enum SyntaxError {
 }
 
 impl Display for SyntaxError {
-
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "{}", self.description())
     }
@@ -329,30 +330,38 @@ impl Error for SyntaxError {
 }
 
 impl AddressLiteral {
-
     /// Create a "general" AddressLiteral which is not IPv4/v6
     ///
     /// This is mainly for enabling other alternatives to IPv4/IPv6.
     /// Note that RFC 5321 limits it to **standarized** tags, i.e.
     /// tags registered with IANA.
     #[doc(hidden)]
-    pub fn custom_literal<AS1, AS2>(standarized_tag: AS1, custom_part: AS2)
-        -> Result<Self, SyntaxError>
-        where AS1: AsRef<str>, AS2: AsRef<str>
+    pub fn custom_literal<AS1, AS2>(
+        standarized_tag: AS1,
+        custom_part: AS2,
+    ) -> Result<Self, SyntaxError>
+    where
+        AS1: AsRef<str>,
+        AS2: AsRef<str>,
     {
         let tag = standarized_tag.as_ref();
-        let valid_tag = tag.as_bytes()
-            .last().map(|bch| *bch != b'-').unwrap_or(false)
-            && tag.bytes().all(|bch| bch.is_ascii_alphanumeric() || bch == b'-');
+        let valid_tag = tag
+            .as_bytes()
+            .last()
+            .map(|bch| *bch != b'-')
+            .unwrap_or(false)
+            && tag
+                .bytes()
+                .all(|bch| bch.is_ascii_alphanumeric() || bch == b'-');
 
         if !valid_tag {
             return Err(SyntaxError::AddressLiteral);
         }
 
         let custom_part = custom_part.as_ref();
-        let valid = custom_part.bytes().all(|bch| {
-            (33 <= bch && bch <= 90) || (94 <= bch && bch <= 126)
-        });
+        let valid = custom_part
+            .bytes()
+            .all(|bch| (33 <= bch && bch <= 90) || (94 <= bch && bch <= 126));
 
         if valid {
             Ok(AddressLiteral(format!("[{}:{}]", tag, custom_part).into()))
@@ -362,13 +371,12 @@ impl AddressLiteral {
     }
 }
 
-
 impl From<IpAddr> for AddressLiteral {
     fn from(addr: IpAddr) -> Self {
         use self::IpAddr::*;
         match addr {
             V4(ref addr) => AddressLiteral::from(addr),
-            V6(ref addr) => AddressLiteral::from(addr)
+            V6(ref addr) => AddressLiteral::from(addr),
         }
     }
 }
@@ -458,13 +466,12 @@ mod test {
             let s: String = a.into();
             assert_eq!(s, "afFen")
         }
-
     }
 
     mod Capability {
-        use std::collections::HashMap;
-        use ::ascii::IgnoreAsciiCaseStr;
         use super::super::Capability;
+        use ascii::IgnoreAsciiCaseStr;
+        use std::collections::HashMap;
 
         #[test]
         fn has_to_work_with_hashmaps() {

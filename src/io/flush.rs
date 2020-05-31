@@ -1,13 +1,11 @@
 use std::io as std_io;
 
-use futures::{Poll, Future, Async};
+use futures::{Async, Future, Poll};
 use tokio::io::AsyncWrite;
 
 use super::Io;
 
-
 impl Io {
-
     /// return a futures resolving back to this instance once all output data is flushed
     pub fn flush(self) -> Flushing {
         Flushing::new(self)
@@ -43,7 +41,7 @@ impl Io {
 }
 
 pub struct Flushing {
-    inner: Option<Io>
+    inner: Option<Io>,
 }
 
 impl Flushing {
@@ -66,4 +64,3 @@ impl Future for Flushing {
         Ok(Async::Ready(io))
     }
 }
-

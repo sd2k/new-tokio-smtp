@@ -1,15 +1,15 @@
 //! error module
-use std::{io as std_io};
+use data_types::{Capability, EsmtpKeyword};
+use response::Response;
 use std::error::Error;
-use std::fmt::{self, Display, Debug};
-use ::data_types::{Capability, EsmtpKeyword};
-use ::response::Response;
+use std::fmt::{self, Debug, Display};
+use std::io as std_io;
 
 #[derive(Debug)]
 pub enum GeneralError {
     Connecting(ConnectingFailed),
     Cmd(LogicError),
-    Io(std_io::Error)
+    Io(std_io::Error),
 }
 
 impl Display for GeneralError {
@@ -53,7 +53,7 @@ pub enum ConnectingFailed {
     Setup(LogicError),
 
     /// the authentication command failed
-    Auth(LogicError)
+    Auth(LogicError),
 }
 
 impl From<std_io::Error> for ConnectingFailed {
@@ -64,7 +64,7 @@ impl From<std_io::Error> for ConnectingFailed {
 
 impl Error for ConnectingFailed {
     fn description(&self) -> &str {
-       "connecting with server failed"
+        "connecting with server failed"
     }
 
     fn cause(&self) -> Option<&Error> {
@@ -72,7 +72,7 @@ impl Error for ConnectingFailed {
         match *self {
             Io(ref err) => Some(err),
             Setup(ref err) => Some(err),
-            Auth(ref err) => Some(err)
+            Auth(ref err) => Some(err),
         }
     }
 }
@@ -83,7 +83,7 @@ impl Display for ConnectingFailed {
         match *self {
             Io(ref err) => write!(fter, "I/O-Error: {}", err),
             Setup(ref err) => write!(fter, "Setup-Error: {}", err),
-            Auth(ref err) => write!(fter, "Authentication-Error: {}", err)
+            Auth(ref err) => write!(fter, "Authentication-Error: {}", err),
         }
     }
 }
@@ -122,7 +122,7 @@ pub enum LogicError {
     Custom(Box<Error + 'static + Send + Sync>),
 
     /// command can not be used, as the server does not promotes the necessary capabilities
-    MissingCapabilities(MissingCapabilities)
+    MissingCapabilities(MissingCapabilities),
 }
 
 impl From<MissingCapabilities> for LogicError {
@@ -131,17 +131,14 @@ impl From<MissingCapabilities> for LogicError {
     }
 }
 
-
-
 impl Error for LogicError {
-
     fn description(&self) -> &str {
         use self::LogicError::*;
         match *self {
             Code(_) => "server responded with error response code",
             UnexpectedCode(_) => "server responded with unexpected non-error response code",
             MissingCapabilities(ref err) => err.description(),
-            Custom(ref boxed) => boxed.description()
+            Custom(ref boxed) => boxed.description(),
         }
     }
 
@@ -149,13 +146,12 @@ impl Error for LogicError {
         use self::LogicError::*;
         match *self {
             Custom(ref boxed) => boxed.cause(),
-            _ => None
+            _ => None,
         }
     }
 }
 
 impl Display for LogicError {
-
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::LogicError::*;
 
@@ -173,17 +169,17 @@ impl Display for LogicError {
 /// e.g. the response does not contain the ehlo keyword `SMTPUTF8`
 #[derive(Debug, Clone)]
 pub struct MissingCapabilities {
-    capabilities: Vec<Capability>
+    capabilities: Vec<Capability>,
 }
 
 impl MissingCapabilities {
-
     pub fn new_from_unchecked<I>(data: I) -> Self
-        where I: Into<String>
+    where
+        I: Into<String>,
     {
-        MissingCapabilities::new(vec![
-            Capability::from(EsmtpKeyword::from_unchecked(data.into()))
-        ])
+        MissingCapabilities::new(vec![Capability::from(EsmtpKeyword::from_unchecked(
+            data.into(),
+        ))])
     }
 
     pub fn new(capabilities: Vec<Capability>) -> Self {
@@ -215,7 +211,6 @@ impl Error for MissingCapabilities {
 }
 
 impl Display for MissingCapabilities {
-
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "missing capabilities:")?;
         let mut first = true;

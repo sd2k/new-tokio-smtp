@@ -1,13 +1,12 @@
 use std::io as std_io;
 
-use futures::{Poll, Future, Async};
-use futures::stream::Stream;
 use bytes::buf::{Buf, BufMut};
+use futures::stream::Stream;
+use futures::{Async, Future, Poll};
 
 use super::{Io, OUTPUT_BUFFER_INC_SIZE};
 
 impl Io {
-
     /// write all data from source to the output socket using dot-stashing
     ///
     /// This includes the end of message sequence "\r\n.\r\n", through this
@@ -15,39 +14,44 @@ impl Io {
     /// of the file if it isn't needed.
     ///
     pub fn write_dot_stashed<S>(self, source: S) -> DotStashedWrite<S>
-        where S: Stream<Error=std_io::Error>, S::Item: Buf
+    where
+        S: Stream<Error = std_io::Error>,
+        S::Item: Buf,
     {
         DotStashedWrite::new(self, source)
     }
 }
 
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 enum CrLf {
     None,
     HitCr,
-    HitLf
+    HitLf,
 }
 
 pub struct DotStashedWrite<S>
-    where S: Stream, S::Item: Buf
+where
+    S: Stream,
+    S::Item: Buf,
 {
     io: Option<Io>,
     source: S,
     stash_state: CrLf,
     /// end of mail sequence i.e. "\r\n.\r\n"
-    write_eom_seq: bool
+    write_eom_seq: bool,
 }
 
 impl<S> DotStashedWrite<S>
-    where S: Stream<Error=std_io::Error>, S::Item: Buf
+where
+    S: Stream<Error = std_io::Error>,
+    S::Item: Buf,
 {
     fn new(io: Io, source: S) -> Self {
         DotStashedWrite {
             source,
             io: Some(io),
             stash_state: CrLf::None,
-            write_eom_seq: false
+            write_eom_seq: false,
         }
     }
 
@@ -86,7 +90,7 @@ impl<S> DotStashedWrite<S>
                     (_, CrLf::None) => (false, CrLf::None),
                     // this _could_ be invalid data but legacy systems _should_
                     // be able to handle orphan '\r'/'\n' so treat it as ok
-                    (_, _) => (false, CrLf::None)
+                    (_, _) => (false, CrLf::None),
                 };
                 state = new_state;
                 if stash {
@@ -107,7 +111,9 @@ impl<S> DotStashedWrite<S>
 }
 
 impl<S> Future for DotStashedWrite<S>
-    where S: Stream<Error=std_io::Error>, S::Item: Buf
+where
+    S: Stream<Error = std_io::Error>,
+    S::Item: Buf,
 {
     type Item = Io;
     type Error = std_io::Error;
@@ -125,11 +131,10 @@ impl<S> Future for DotStashedWrite<S>
                 return Ok(Async::Ready(self.io.take().expect("poll after completion")));
             }
 
-            let pending =
-                match try_ready!(self.poll_source()) {
-                    Some(p) => p,
-                    None => continue
-                };
+            let pending = match try_ready!(self.poll_source()) {
+                Some(p) => p,
+                None => continue,
+            };
 
             self.write_dot_stashed_output(pending);
         }

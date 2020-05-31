@@ -1,23 +1,18 @@
-use std::{io as std_io};
 use std::collections::HashMap;
+use std::io as std_io;
 
 use bytes::BufMut;
 use futures::Future;
 
-use ::error::MissingCapabilities;
-use ::{
-    Domain, EhloData, SyntaxError, EhloParam,
-    Cmd, ExecFuture, Io, Response, ClientId
-};
-
+use error::MissingCapabilities;
+use {ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture, Io, Response, SyntaxError};
 
 #[derive(Debug, Clone)]
 pub struct Ehlo {
-    identity: ClientId
+    identity: ClientId,
 }
 
 impl Ehlo {
-
     pub fn new(identity: ClientId) -> Self {
         Ehlo { identity }
     }
@@ -40,17 +35,14 @@ impl Into<ClientId> for Ehlo {
 }
 
 impl Cmd for Ehlo {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
-       Ok(())
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
+        Ok(())
     }
 
     fn exec(self, mut io: Io) -> ExecFuture {
         let str_me = match *self.identity() {
             ClientId::Domain(ref domain) => domain.as_str(),
-            ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str()
+            ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str(),
         };
 
         {
@@ -91,21 +83,22 @@ fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
         let mut parts = line.split(" ");
         //UNWRAP_SAFE: Split has at last one entry
         let capability = parts.next().unwrap().parse()?;
-        let params = parts.map(|part| part.parse()).collect::<Result<Vec<EhloParam>, _>>()?;
+        let params = parts
+            .map(|part| part.parse())
+            .collect::<Result<Vec<EhloParam>, _>>()?;
         caps.insert(capability, params);
     }
 
     Ok(EhloData::new(domain, caps))
 }
 
-
 #[cfg(test)]
 mod test {
 
     mod parse_ehlo_response {
-        use ::Response;
-        use ::response::codes::OK;
         use super::super::parse_ehlo_response;
+        use response::codes::OK;
+        use Response;
 
         #[test]
         fn simple_case() {
@@ -127,16 +120,22 @@ mod test {
 
         #[test]
         fn can_have_capabilities() {
-            let response = Response::new(OK, vec![
-                "1aim.test says hy".to_owned(),
-                "SMTPUTF8".to_owned(),
-                "MIME8".to_owned(),
-            ]);
+            let response = Response::new(
+                OK,
+                vec![
+                    "1aim.test says hy".to_owned(),
+                    "SMTPUTF8".to_owned(),
+                    "MIME8".to_owned(),
+                ],
+            );
             let ehlo_data = parse_ehlo_response(&response).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert!(ehlo_data.has_capability("SMTPUTF8"));
-            assert!(ehlo_data.get_capability_params("SMTPUTF8").unwrap().is_empty());
+            assert!(ehlo_data
+                .get_capability_params("SMTPUTF8")
+                .unwrap()
+                .is_empty());
             assert!(ehlo_data.has_capability("MIME8"));
             assert!(ehlo_data.get_capability_params("MIME8").unwrap().is_empty());
             assert_eq!(ehlo_data.capability_map().len(), 2)
@@ -144,10 +143,13 @@ mod test {
 
         #[test]
         fn capabilities_can_have_parameter() {
-            let response = Response::new(OK, vec![
-                "1aim.test says hy".to_owned(),
-                "X-NOT-A-ROBOT ENABLED".to_owned(),
-            ]);
+            let response = Response::new(
+                OK,
+                vec![
+                    "1aim.test says hy".to_owned(),
+                    "X-NOT-A-ROBOT ENABLED".to_owned(),
+                ],
+            );
             let ehlo_data = parse_ehlo_response(&response).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");

@@ -1,16 +1,15 @@
 //! This modules contains all the `Io` type related parts (for implementing `Cmd`)
 //!
-use bytes::BytesMut;
 use bytes::buf::BufMut;
+use bytes::BytesMut;
 use futures::Future;
-use tokio_tls::TlsStream;
 use tokio::net::TcpStream;
+use tokio_tls::TlsStream;
 
-use ::common::EhloData;
-use ::response::Response;
-use ::error::LogicError;
 use super::ExecFuture;
-
+use common::EhloData;
+use error::LogicError;
+use response::Response;
 
 mod socket;
 pub use self::socket::*;
@@ -46,7 +45,6 @@ pub struct Io {
 }
 
 impl Io {
-
     /*
        //---------------------------------------------------------------\\
       || Note: More methods are provided through the io::* submodules    ||
@@ -55,15 +53,17 @@ impl Io {
 
     /// split this instance into it's parts
     pub fn split(self) -> (Socket, Buffers, Option<EhloData>) {
-        let Io { socket, buffer, ehlo_data } = self;
+        let Io {
+            socket,
+            buffer,
+            ehlo_data,
+        } = self;
         (socket, buffer, ehlo_data)
     }
 
     /// writes all strings in `parts` to the output buffer followed by `"\r\n"`
     pub fn write_line_from_parts(&mut self, parts: &[&str]) {
-        let len = parts
-            .iter()
-            .fold(CR_LF.len(), |sum, item| sum + item.len());
+        let len = parts.iter().fold(CR_LF.len(), |sum, item| sum + item.len());
 
         let buffer = self.out_buffer(len);
         for part in parts {
@@ -114,47 +114,61 @@ impl Io {
     /// checks if a specific `EsmtpKeyword` had been in the last
     /// Ehlo response
     pub fn has_capability<C>(&self, cap: C) -> bool
-        where C: AsRef<str>
+    where
+        C: AsRef<str>,
     {
-        self.ehlo_data().map(|ehlo| {
-            ehlo.has_capability(cap)
-        }).unwrap_or(false)
+        self.ehlo_data()
+            .map(|ehlo| ehlo.has_capability(cap))
+            .unwrap_or(false)
     }
 
     /// used to impl. simple commands e.g. `con.send_simple_cmd(&["NOOP"])`
     pub fn exec_simple_cmd(mut self, parts: &[&str]) -> ExecFuture {
         self.write_line_from_parts(parts);
 
-        let fut = self
-            .flush()
-            .and_then(Io::parse_response);
+        let fut = self.flush().and_then(Io::parse_response);
 
         Box::new(fut)
     }
-
 }
 
 impl From<(Socket, Buffers, Option<EhloData>)> for Io {
     fn from((socket, buffer, ehlo_data): (Socket, Buffers, Option<EhloData>)) -> Self {
-        Io { socket, buffer, ehlo_data }
+        Io {
+            socket,
+            buffer,
+            ehlo_data,
+        }
     }
 }
 
 impl From<(Socket, Buffers, EhloData)> for Io {
     fn from((socket, buffer, ehlo_data): (Socket, Buffers, EhloData)) -> Self {
-        Io { socket, buffer, ehlo_data: Some(ehlo_data) }
+        Io {
+            socket,
+            buffer,
+            ehlo_data: Some(ehlo_data),
+        }
     }
 }
 
 impl From<(Socket, Buffers)> for Io {
     fn from((socket, buffer): (Socket, Buffers)) -> Self {
-        Io { socket, buffer, ehlo_data: None }
+        Io {
+            socket,
+            buffer,
+            ehlo_data: None,
+        }
     }
 }
 
 impl From<Socket> for Io {
     fn from(socket: Socket) -> Self {
-        Io { socket, buffer: Buffers::new(), ehlo_data: None }
+        Io {
+            socket,
+            buffer: Buffers::new(),
+            ehlo_data: None,
+        }
     }
 }
 
@@ -184,12 +198,11 @@ pub struct Buffers {
 }
 
 impl Buffers {
-
     /// create new empty buffers
     pub fn new() -> Self {
         Buffers {
             input: BytesMut::new(),
-            output: BytesMut::new()
+            output: BytesMut::new(),
         }
     }
 }

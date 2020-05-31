@@ -1,5 +1,5 @@
-use ::{ExecFuture, Cmd, Io, EhloData};
-use ::error::{MissingCapabilities};
+use error::MissingCapabilities;
+use {Cmd, EhloData, ExecFuture, Io};
 
 /// An either of two commands
 ///

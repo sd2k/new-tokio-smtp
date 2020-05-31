@@ -1,11 +1,11 @@
+use std::borrow::{Borrow, ToOwned};
 use std::hash::{Hash, Hasher};
-use std::borrow::{ToOwned, Borrow};
 use std::ops::Deref;
 
 /// A string which ignores ascii case when compared
 #[derive(Debug, Eq, Clone)]
 pub struct IgnoreAsciiCaseString {
-    inner: String
+    inner: String,
 }
 
 impl IgnoreAsciiCaseString {
@@ -27,7 +27,6 @@ impl AsRef<IgnoreAsciiCaseStr> for IgnoreAsciiCaseString {
 }
 
 impl Borrow<IgnoreAsciiCaseStr> for IgnoreAsciiCaseString {
-
     fn borrow(&self) -> &IgnoreAsciiCaseStr {
         let as_str = &*self.inner;
         as_str.into()
@@ -59,7 +58,6 @@ impl Hash for IgnoreAsciiCaseString {
     }
 }
 
-
 impl Deref for IgnoreAsciiCaseString {
     type Target = IgnoreAsciiCaseStr;
 
@@ -68,16 +66,14 @@ impl Deref for IgnoreAsciiCaseString {
     }
 }
 
-
 /// a `str` which uses ascii case when compared
 #[derive(Debug, Eq)]
 #[repr(C)]
 pub struct IgnoreAsciiCaseStr {
-    inner: str
+    inner: str,
 }
 
 impl IgnoreAsciiCaseStr {
-
     pub fn as_str(&self) -> &str {
         self.into()
     }
@@ -100,7 +96,6 @@ impl AsRef<str> for IgnoreAsciiCaseStr {
 }
 
 impl<'a> Into<&'a str> for &'a IgnoreAsciiCaseStr {
-
     fn into(self) -> &'a str {
         &self.inner
     }
@@ -113,7 +108,6 @@ impl<'a> Into<String> for &'a IgnoreAsciiCaseStr {
 }
 
 impl<'a> From<&'a str> for &'a IgnoreAsciiCaseStr {
-
     fn from(v: &'a str) -> &'a IgnoreAsciiCaseStr {
         let v = v as *const str as *const IgnoreAsciiCaseStr;
         unsafe { &*v }
@@ -125,7 +119,6 @@ impl Hash for IgnoreAsciiCaseStr {
         ignore_ascii_hash(&self.inner, state)
     }
 }
-
 
 macro_rules! impl_eq {
     ($($name:ident),*) => ($(
@@ -170,7 +163,8 @@ macro_rules! impl_eq {
 impl_eq!(IgnoreAsciiCaseString, IgnoreAsciiCaseStr);
 
 fn ignore_ascii_hash<H>(data: &str, state: &mut H)
-    where H: Hasher
+where
+    H: Hasher,
 {
     for bch in data.bytes() {
         let lb = bch.to_ascii_lowercase();
@@ -178,13 +172,10 @@ fn ignore_ascii_hash<H>(data: &str, state: &mut H)
     }
 }
 
-
-
-
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn can_be_used_with_hash_map() {
