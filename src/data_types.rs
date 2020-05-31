@@ -247,7 +247,7 @@ impl EsmtpValue {
             let sfyied: String = val.into();
             Ok(EsmtpValue(sfyied.into()))
         } else {
-            Err(SyntaxError::EsmtpKeyword)
+            Err(SyntaxError::EsmtpValue)
         }
     }
 }

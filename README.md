@@ -297,6 +297,10 @@ Change Log
 - `v0.8.1`
   - `SelectCmd` and `EitherCmd` where added
 
+- `v0.8.2`
+  - Fix bug where the wrong parsing error was emitted for
+    `EsmtpValue`
+
 
 Contributors
 -------------
