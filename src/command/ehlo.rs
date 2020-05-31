@@ -1,11 +1,12 @@
-use std::collections::HashMap;
-use std::io as std_io;
+use std::{collections::HashMap, io as std_io};
 
+use log::warn;
 use bytes::BufMut;
 use futures::Future;
 
 use crate::{
     ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture, Io, Response, SyntaxError,
+    Capability,
     error::MissingCapabilities
 };
 
@@ -82,16 +83,27 @@ fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
     let mut caps = HashMap::new();
 
     for line in lines[1..].iter() {
-        let mut parts = line.split(" ");
-        //UNWRAP_SAFE: Split has at last one entry
-        let capability = parts.next().unwrap().parse()?;
-        let params = parts
-            .map(|part| part.parse())
-            .collect::<Result<Vec<EhloParam>, _>>()?;
-        caps.insert(capability, params);
+        match parse_capability_in_ehlo_response(line) {
+            Ok((cap, params)) => {
+                caps.insert(cap, params);
+            },
+            Err(err) => {
+                warn!("Parsing Server EHLO response partially failed: {}", err);
+            }
+        }
     }
 
     Ok(EhloData::new(domain, caps))
+}
+
+fn parse_capability_in_ehlo_response(line: &str) -> Result<(Capability, Vec<EhloParam>), SyntaxError> {
+    let mut parts = line.split(" ");
+    //UNWRAP_SAFE: Split has at last one entry
+    let capability = parts.next().unwrap().parse()?;
+    let params = parts
+        .map(|part| part.parse())
+        .collect::<Result<Vec<EhloParam>, _>>()?;
+    Ok((capability, params))
 }
 
 #[cfg(test)]
@@ -161,6 +173,23 @@ mod test {
             let params = ehlo_data.get_capability_params("X-NOT-A-ROBOT").unwrap();
             assert_eq!(params.len(), 1);
             assert_eq!(params[0], "ENABLED");
+        }
+
+        #[test]
+        fn ignore_malformed_capabilities() {
+            let response = Response::new(
+                OK,
+                vec![
+                    "1aim.test says hy".to_owned(),
+                    "X-NOT-\0-ROBOT".to_owned(),
+                    "X-NOT-A-ROBOT".to_owned(),
+                ],
+            );
+            let ehlo_data = parse_ehlo_response(&response).unwrap();
+
+            assert_eq!(ehlo_data.domain(), "1aim.test");
+            assert_eq!(ehlo_data.capability_map().len(), 1);
+            assert!(ehlo_data.has_capability("X-NOT-A-ROBOT"));
         }
     }
 }

@@ -326,6 +326,7 @@ Change Log
   - Fix bug where the wrong parsing error was emitted for
     `EsmtpValue`
   - Now uses `rustfmt`.
+  - Warn but not fail on un-parsable ehlo capability response lines
 
 
 Contributors
