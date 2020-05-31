@@ -170,6 +170,16 @@ fn read_password() -> String {
 }
 ```
 
+Testing
+---------
+
+`cargo test --features "mock-impl"`
+
+Just running `cargo test` won't work for now,
+this might be fixed in the future with cargo
+supporting "for testing only default features"
+or similar.
+
 Concept
 --------
 
