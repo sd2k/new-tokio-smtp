@@ -1,6 +1,21 @@
 new-tokio-smtp [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 =====================
 
+Maintenance Status
+------------------
+
+This crate is currently passively maintained, this means:
+
+- I will still respond to bugs, and fix them (if this doesn't involve any *major* rewrites).
+- I will still evaluate and merge PR's. (As long as I don't get flooded and they don't rewrite
+  the whole crate or similar ;-)
+
+Also the maintenance status might go back to actively maintained in the future.
+
+
+Description
+-------------
+
 The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
 implementation using tokio.
 
