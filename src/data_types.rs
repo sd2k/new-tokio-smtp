@@ -188,7 +188,7 @@ impl FromStr for EhloParam {
         if valid {
             Ok(EhloParam(inp.to_owned().into()))
         } else {
-            Err(SyntaxError::Param)
+            Err(SyntaxError::EhloParam(inp.into()))
         }
     }
 }
@@ -201,10 +201,11 @@ impl EsmtpKeyword {
     /// can be used as `EsmtpKeyword` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
     where
-        I: AsRef<str> + Into<String>,
+        I: Into<String>,
     {
+        let val = val.into();
         let valid = {
-            let mut iter = val.as_ref().chars();
+            let mut iter = val.chars();
             iter.next()
                 .map(|ch| ch.is_ascii_alphanumeric())
                 .unwrap_or(false)
@@ -212,11 +213,11 @@ impl EsmtpKeyword {
         };
 
         if valid {
-            let mut sfyied: String = val.into();
-            sfyied.make_ascii_uppercase();
-            Ok(EsmtpKeyword(sfyied.into()))
+            let mut val = val;
+            val.make_ascii_uppercase();
+            Ok(EsmtpKeyword(val.into()))
         } else {
-            Err(SyntaxError::EsmtpKeyword)
+            Err(SyntaxError::EsmtpKeyword(val.into()))
         }
     }
 }
@@ -237,18 +238,17 @@ impl EsmtpValue {
     /// can be used as `EsmtpValue` implements `FromStr`.
     pub fn new<I>(val: I) -> Result<Self, SyntaxError>
     where
-        I: AsRef<str> + Into<String>,
+        I: Into<String>,
     {
+        let val = val.into();
         let valid = val
-            .as_ref()
             .bytes()
             .all(|bch| 33 <= bch && (bch <= 60 || (62 <= bch && bch <= 128)));
 
         if valid {
-            let sfyied: String = val.into();
-            Ok(EsmtpValue(sfyied.into()))
+            Ok(EsmtpValue(val.into()))
         } else {
-            Err(SyntaxError::EsmtpValue)
+            Err(SyntaxError::EsmtpValue(val))
         }
     }
 }
@@ -285,7 +285,7 @@ impl FromStr for Domain {
         if valid {
             Ok(Domain(inp.to_lowercase().into()))
         } else {
-            Err(SyntaxError::Domain)
+            Err(SyntaxError::Domain(inp.into()))
         }
     }
 }
@@ -301,26 +301,32 @@ fn validate_subdomain(inp: &str) -> bool {
         && binp[len - 1].is_ascii_alphanumeric()
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SyntaxError {
-    Domain,
-    Param,
-    AddressLiteral,
-    EsmtpValue,
-    EsmtpKeyword,
+    Domain(String),
+    EhloParam(String),
+    AddressLiteral {
+        tag: String,
+        value: String,
+        was_bad_tag: bool
+    },
+    EsmtpValue(String),
+    EsmtpKeyword(String),
 }
 
 impl Display for SyntaxError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::SyntaxError::*;
-        let msg = match *self {
-            Domain => "syntax error parsing Domain from str",
-            Param => "syntax error parsing Param str",
-            EsmtpKeyword => "syntax error parsing esmtp-keyword from str",
-            EsmtpValue => "syntax error parsing esmtp-value from str",
-            AddressLiteral => "syntax error parsing address-literal from str",
-        };
-        fter.write_str(msg)
+        match self {
+            Domain(bad_param) => write!(fter, "syntax error parsing Domain in {:?}", bad_param),
+            EhloParam(bad_param) => write!(fter, "syntax error parsing EhloParam in {:?}", bad_param),
+            EsmtpKeyword(bad_kw) => write!(fter, "syntax error parsing esmtp-keyword in {:?}", bad_kw),
+            EsmtpValue(bad_value) => write!(fter, "syntax error parsing esmtp-value in {:?}", bad_value),
+            AddressLiteral { tag, value, was_bad_tag} => {
+                let place = if *was_bad_tag { "tag" } else { "value" };
+                write!(fter, "syntax error parsing address-literal (malformed {}) in {:?}:{:?}", place, tag, value)
+            }
+        }
     }
 }
 
@@ -353,7 +359,11 @@ impl AddressLiteral {
                 .all(|bch| bch.is_ascii_alphanumeric() || bch == b'-');
 
         if !valid_tag {
-            return Err(SyntaxError::AddressLiteral);
+            return Err(SyntaxError::AddressLiteral {
+                tag: tag.into(),
+                value: custom_part.as_ref().into(),
+                was_bad_tag: true
+            });
         }
 
         let custom_part = custom_part.as_ref();
@@ -364,7 +374,11 @@ impl AddressLiteral {
         if valid {
             Ok(AddressLiteral(format!("[{}:{}]", tag, custom_part).into()))
         } else {
-            Err(SyntaxError::AddressLiteral)
+            Err(SyntaxError::AddressLiteral {
+                tag: tag.into(),
+                value: custom_part.into(),
+                was_bad_tag: false
+            })
         }
     }
 }
