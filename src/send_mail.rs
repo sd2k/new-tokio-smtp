@@ -95,13 +95,15 @@ use futures::stream::Stream;
 use futures::{Async, IntoFuture, Poll};
 use vec1::Vec1;
 
-use chain::{chain, HandleErrorInChain, OnError};
-use command::{self, params_with_smtputf8};
-use common::SetupTls;
-use connect::ConnectionConfig;
-use data_types::{ForwardPath, ReversePath};
-use error::{GeneralError, LogicError, MissingCapabilities};
-use {Cmd, Connection};
+use crate::{
+    chain::{chain, HandleErrorInChain, OnError},
+    command::{self, params_with_smtputf8},
+    common::SetupTls,
+    connect::ConnectionConfig,
+    data_types::{ForwardPath, ReversePath},
+    error::{GeneralError, LogicError, MissingCapabilities},
+    {Cmd, Connection},
+};
 
 /// Specifies if the mail requires SMTPUTF8 (or Mime8bit)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -330,7 +332,7 @@ pub type MailSendResult = Result<(), (usize, LogicError)>;
 
 /// Future returned by `send_mail`
 pub type MailSendFuture =
-    Box<Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>;
+    Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>;
 
 /// Sends a mail specified through `MailEnvelop` through the connection `con`.
 ///
@@ -506,7 +508,7 @@ pub struct SendAllMails<I> {
     mails: I,
     con: Option<Connection>,
     //FIXME[rust/impl Trait in struct]
-    pending: Option<Box<Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>>,
+    pending: Option<Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>>,
 }
 
 impl<I, E> SendAllMails<I>
@@ -744,9 +746,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use error::GeneralError;
-    use send_mail::MailEnvelop;
-    use {command, Connection, ConnectionConfig};
+    use crate::{
+        command, Connection, ConnectionConfig,
+        error::GeneralError,
+        send_mail::MailEnvelop,
+    };
 
     fn assert_send(_: &impl Send) {}
 

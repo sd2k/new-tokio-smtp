@@ -6,7 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str::FromStr;
 
-use ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
+use crate::ascii::{IgnoreAsciiCaseStr, IgnoreAsciiCaseString};
 
 /// represents a smtp extension/capability indicated through ehlo
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -312,22 +312,20 @@ pub enum SyntaxError {
 
 impl Display for SyntaxError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        write!(fter, "{}", self.description())
-    }
-}
-
-impl Error for SyntaxError {
-    fn description(&self) -> &str {
         use self::SyntaxError::*;
-        match *self {
+        let msg = match *self {
             Domain => "syntax error parsing Domain from str",
             Param => "syntax error parsing Param str",
             EsmtpKeyword => "syntax error parsing esmtp-keyword from str",
             EsmtpValue => "syntax error parsing esmtp-value from str",
             AddressLiteral => "syntax error parsing address-literal from str",
-        }
+        };
+        fter.write_str(msg)
     }
 }
+
+impl Error for SyntaxError {}
+
 
 impl AddressLiteral {
     /// Create a "general" AddressLiteral which is not IPv4/v6
@@ -470,7 +468,7 @@ mod test {
 
     mod Capability {
         use super::super::Capability;
-        use ascii::IgnoreAsciiCaseStr;
+        use crate::ascii::IgnoreAsciiCaseStr;
         use std::collections::HashMap;
 
         #[test]

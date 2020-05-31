@@ -2,9 +2,11 @@ use base64::encode;
 use futures::future::{self, Either, Future};
 
 use super::validate_auth_capability;
-use error::{LogicError, MissingCapabilities};
-use future_ext::ResultWithContextExt;
-use {Cmd, EhloData, ExecFuture, Io};
+use crate::{
+    Cmd, EhloData, ExecFuture, Io,
+    error::{LogicError, MissingCapabilities},
+    future_ext::ResultWithContextExt,
+};
 
 /// Simple implementation of AUTH LOGIN for smtp.
 #[derive(Debug, Clone)]

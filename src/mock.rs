@@ -13,7 +13,7 @@ use futures::task::{self, Task};
 use futures::{future, Async, Future, Poll, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use io::MockStream;
+use crate::io::MockStream;
 
 /// Represents if the action is taken by `Client` or `Server`
 #[derive(Debug)]
@@ -299,16 +299,16 @@ impl Drop for MockSocket {
     }
 }
 
-impl From<MockSocket> for ::io::Socket {
+impl From<MockSocket> for crate::io::Socket {
     fn from(s: MockSocket) -> Self {
-        ::io::Socket::Mock(Box::new(s))
+        crate::io::Socket::Mock(Box::new(s))
     }
 }
 
-impl From<MockSocket> for ::io::Io {
+impl From<MockSocket> for crate::io::Io {
     fn from(s: MockSocket) -> Self {
-        let socket: ::io::Socket = s.into();
-        ::io::Io::from((socket, ::io::Buffers::new()))
+        let socket: crate::io::Socket = s.into();
+        crate::io::Io::from((socket, crate::io::Buffers::new()))
     }
 }
 
@@ -631,7 +631,7 @@ mod test {
     use futures::sync::oneshot;
     use futures::{future, Future};
 
-    fn time_out(secs: u64) -> Box<Future<Item = (), Error = ()>> {
+    fn time_out(secs: u64) -> Box<dyn Future<Item = (), Error = ()>> {
         let (tx, rx) = oneshot::channel();
         thread::spawn(move || {
             thread::sleep(Duration::new(secs, 0));

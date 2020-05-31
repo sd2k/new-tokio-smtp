@@ -1,5 +1,4 @@
-use std::io as std_io;
-use std::net::SocketAddr;
+use std::{io as std_io, net::SocketAddr};
 
 use futures::future::{self, Either, Future, Map};
 use native_tls::TlsConnector as NativeTlsConnector;
@@ -7,7 +6,7 @@ use tokio::net::tcp::{ConnectFuture, TcpStream};
 use tokio_tls::TlsConnector;
 
 use super::Io;
-use common::{map_tls_err, SetupTls, TlsConfig};
+use crate::common::{map_tls_err, SetupTls, TlsConfig};
 
 impl Io {
     /// create a new Tcp only connection to the given address

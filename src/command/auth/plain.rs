@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use base64::encode;
 
-use error::MissingCapabilities;
-use {Cmd, EhloData, ExecFuture, Io};
+use crate::{
+    error::MissingCapabilities,
+    Cmd, EhloData, ExecFuture, Io,
+};
 
 use super::validate_auth_capability;
 
@@ -121,16 +123,8 @@ pub struct NullCodePointError;
 
 impl Display for NullCodePointError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
-        fter.write_str(self.description())
+        write!(fter, "input (username/password) contained null byte")
     }
 }
 
-impl ErrorTrait for NullCodePointError {
-    fn description(&self) -> &str {
-        "input (username/password) contained null byte"
-    }
-
-    fn cause(&self) -> Option<&ErrorTrait> {
-        None
-    }
-}
+impl ErrorTrait for NullCodePointError {}

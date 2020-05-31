@@ -5,12 +5,11 @@ use futures::future::{self, Either, Future};
 use native_tls::TlsConnector as NativeTlsConnector;
 use tokio_tls::TlsConnector;
 
-use error::MissingCapabilities;
-use io::{Io, Socket};
-use response::{codes, Response};
-use {
-    map_tls_err, Capability, Cmd, DefaultTlsSetup, Domain, EhloData, EsmtpKeyword, ExecFuture,
-    SetupTls,
+use crate::{
+    map_tls_err, Capability, Cmd, DefaultTlsSetup, Domain, EhloData, EsmtpKeyword, ExecFuture, SetupTls,
+    error::MissingCapabilities,
+    io::{Io, Socket},
+    response::{codes, Response},
 };
 
 pub struct StartTls<S = DefaultTlsSetup> {

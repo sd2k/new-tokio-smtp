@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/1aim/new-tokio-smtp"
 version = "0.8.2"
 readme="./README.md"
+edition="2018"
 
 [features]
 default = ['send-mail']

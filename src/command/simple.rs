@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use common::EhloData;
-use data_types::{EsmtpKeyword, EsmtpValue, ForwardPath, ReversePath};
-use error::MissingCapabilities;
-use {Cmd, ExecFuture, Io};
+use crate::{
+    Cmd, ExecFuture, Io,
+    common::EhloData,
+    data_types::{EsmtpKeyword, EsmtpValue, ForwardPath, ReversePath},
+    error::MissingCapabilities,
+};
 
 /// Quit command, but as it makes the connection unusable we do
 /// not publicly provide it for usage with `Connection::send`,

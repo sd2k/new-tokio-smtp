@@ -4,18 +4,19 @@ use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs};
 
 use futures::future::{self, Either, Future};
 
-use common::{ClientId, DefaultTlsSetup, SetupTls, TlsConfig};
-use connection::{Cmd, Connection};
-use data_types::Domain;
-use error::{ConnectingFailed, LogicError};
-use future_ext::ResultWithContextExt;
-use io::{Io, SmtpResult};
-//NOTE: out-of-order (potential circular) dep, but ok in this case
-use command::Noop;
+use crate::{
+    common::{ClientId, DefaultTlsSetup, SetupTls, TlsConfig},
+    connection::{Cmd, Connection},
+    data_types::Domain,
+    error::{ConnectingFailed, LogicError},
+    future_ext::ResultWithContextExt,
+    io::{Io, SmtpResult},
+    command::Noop,
+};
 
 /// A future resolving to an `Connection` instance
 pub type ConnectingFuture =
-    Box<Future<Item = Connection, Error = ConnectingFailed> + Send + 'static>;
+    Box<dyn Future<Item = Connection, Error = ConnectingFailed> + Send + 'static>;
 
 pub const DEFAULT_SMTP_MSA_PORT: u16 = 587;
 pub const DEFAULT_SMTP_MX_PORT: u16 = 25;
@@ -111,7 +112,7 @@ impl Connection {
     ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::Ehlo;
+        use crate::command::Ehlo;
         let fut = Connection::_connect_insecure_no_ehlo(addr).and_then(|con| {
             con.send(Ehlo::from(clid))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
@@ -131,7 +132,7 @@ impl Connection {
     {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::Ehlo;
+        use crate::command::Ehlo;
         let fut = Connection::_connect_direct_tls_no_ehlo(addr, config).and_then(|con| {
             con.send(Ehlo::from(clid))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
@@ -151,7 +152,7 @@ impl Connection {
     {
         //Note: this has a circular dependency between Connection <-> cmd StartTls/Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
-        use command::{Ehlo, StartTls};
+        use crate::command::{Ehlo, StartTls};
         let TlsConfig { domain, setup } = config;
 
         let fut = Connection::_connect_insecure(&addr, clid.clone())

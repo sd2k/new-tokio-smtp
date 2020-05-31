@@ -1,13 +1,17 @@
 use std::io as std_io;
 
 use bytes::{Buf, IntoBuf};
-use future_ext::ResultWithContextExt;
-use futures::future::{self, Either, Future};
-use futures::stream::{self, Stream};
+use futures::{
+    future::{self, Either, Future},
+    stream::{self, Stream}
+};
 
-use error::{LogicError, MissingCapabilities};
-use response::codes;
-use {Cmd, EhloData, ExecFuture, Io};
+use crate::{
+    Cmd, EhloData, ExecFuture, Io,
+    error::{LogicError, MissingCapabilities},
+    response::codes,
+    future_ext::ResultWithContextExt,
+};
 
 pub struct Data<S> {
     //TODO add parameter support

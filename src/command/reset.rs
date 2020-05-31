@@ -2,9 +2,11 @@ use std::io as std_io;
 
 use futures::Future;
 
-use common::EhloData;
-use error::{LogicError, MissingCapabilities};
-use {Cmd, ExecFuture, Io};
+use crate::{
+    Cmd, ExecFuture, Io,
+    common::EhloData,
+    error::{LogicError, MissingCapabilities},
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Reset;

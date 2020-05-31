@@ -1,15 +1,16 @@
 //! This modules contains all the `Io` type related parts (for implementing `Cmd`)
 //!
-use bytes::buf::BufMut;
-use bytes::BytesMut;
+use bytes::{buf::BufMut, BytesMut};
 use futures::Future;
 use tokio::net::TcpStream;
 use tokio_tls::TlsStream;
 
 use super::ExecFuture;
-use common::EhloData;
-use error::LogicError;
-use response::Response;
+use crate::{
+    common::EhloData,
+    error::LogicError,
+    response::Response,
+};
 
 mod socket;
 pub use self::socket::*;
