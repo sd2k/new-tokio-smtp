@@ -191,5 +191,63 @@ mod test {
             assert_eq!(ehlo_data.capability_map().len(), 1);
             assert!(ehlo_data.has_capability("X-NOT-A-ROBOT"));
         }
+
+        #[test]
+        fn issue_05_a() {
+            let response = Response::new(
+                OK,
+                vec![
+                    "example.de ESMTP Postfix (Debian/GNU)".to_owned(),
+                    "example.de".to_owned(),
+                    "PIPELINING".to_owned(),
+                    "SIZE 90000000".to_owned(),
+                    "VRFY".to_owned(),
+                    "ETRN".to_owned(),
+                    "STARTTLS".to_owned(),
+                    "ENHANCEDSTATUSCODES".to_owned(),
+                    "8BITMIME".to_owned(),
+                    "DSN".to_owned(),
+                ],
+            );
+            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+        }
+
+        #[test]
+        fn issue_05_b() {
+            let response = Response::new(
+                OK,
+                vec![
+                    "example.de ESMTP Postfix (Debian/GNU)".to_owned(),
+                    "PIPELINING".to_owned(),
+                    "SIZE 90000000".to_owned(),
+                    "VRFY".to_owned(),
+                    "ETRN".to_owned(),
+                    "STARTTLS".to_owned(),
+                    "ENHANCEDSTATUSCODES".to_owned(),
+                    "8BITMIME".to_owned(),
+                    "DSN".to_owned(),
+                ],
+            );
+            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+        }
+
+        #[test]
+        fn issue_05_c() {
+            let response = Response::new(
+                OK,
+                vec![
+                    "example.de".to_owned(),
+                    "PIPELINING".to_owned(),
+                    "SIZE 90000000".to_owned(),
+                    "VRFY".to_owned(),
+                    "ETRN".to_owned(),
+                    "STARTTLS".to_owned(),
+                    "ENHANCEDSTATUSCODES".to_owned(),
+                    "8BITMIME".to_owned(),
+                    "DSN".to_owned(),
+                ],
+            );
+            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+        }
     }
 }
