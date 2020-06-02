@@ -1,7 +1,10 @@
 use futures::Future;
+use vec1::vec1;
 
-use new_tokio_smtp::mock::{ActionData, Actor};
-use new_tokio_smtp::send_mail::{EncodingRequirement, Mail, MailAddress, MailEnvelop};
+use new_tokio_smtp::{
+    mock::{ActionData, Actor},
+    send_mail::{EncodingRequirement, Mail, MailAddress, MailEnvelop},
+};
 
 use self::ActionData::*;
 use self::Actor::*;

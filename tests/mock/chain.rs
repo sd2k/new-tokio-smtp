@@ -2,10 +2,13 @@ use std::io as std_io;
 
 use futures::{future, Future};
 
-use new_tokio_smtp::chain::{HandleErrorInChain, OnError};
-use new_tokio_smtp::error::LogicError;
-use new_tokio_smtp::mock::{ActionData, Actor};
-use new_tokio_smtp::{command, Connection};
+use new_tokio_smtp::{
+    command, Connection,
+    chain::{HandleErrorInChain, OnError},
+    error::LogicError,
+    mock::{ActionData, Actor},
+    smtp_chain
+};
 
 use self::ActionData::*;
 use self::Actor::*;

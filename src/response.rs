@@ -37,7 +37,9 @@ impl Response {
     }
 }
 
-/// the response code of used by smtp server
+/// The response code of used by smtp server.
+//FIXME impl Display
+//FIXME impl Debug which shows it as byte string, i.e. human readable
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ResponseCode([u8; 3]);
 
@@ -67,7 +69,12 @@ impl ResponseCode {
         !self.is_positive() && !self.is_intermediate()
     }
 
-    /// the actual bytes returned as response code
+    /// The actual bytes returned as response code.
+    ///
+    /// This could be for example `*b'250'`. I.e. it's
+    /// in ascii characters. It's *not* a triplet of the
+    /// ascii characters converted to integer numbers!
+    //FIXME rename to as_ascii_bytes
     pub fn as_byte_string(&self) -> [u8; 3] {
         self.0
     }
@@ -102,11 +109,7 @@ pub mod parser {
         }
     }
 
-    impl Error for ParseError {
-        fn description(&self) -> &str {
-            ""
-        }
-    }
+    impl Error for ParseError {}
 
     pub struct ResponseLine {
         pub code: ResponseCode,
@@ -153,6 +156,7 @@ pub mod parser {
         // there is hardly any reason to be super struct on the response code
         // so aslong as it's a number it's fine
         if kind.is_ascii_digit() && category.is_ascii_digit() && detail.is_ascii_digit() {
+            //FIXME kind-b'0', category-b'0', detail-b'0'
             Ok(ResponseCode([kind, category, detail]))
         } else {
             Err(ParseError::CodeFormat {

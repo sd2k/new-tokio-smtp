@@ -1,5 +1,4 @@
-use std::io as std_io;
-use std::mem;
+use std::{io as std_io, mem};
 
 use bytes::BufMut;
 use futures::{Async, Future, Poll};
@@ -59,9 +58,7 @@ impl Io {
 
         let eol = (&*input)
             .windows(2)
-            .enumerate()
-            .find(|&(_idx, pair)| pair == b"\r\n")
-            .map(|(idx, _)| idx);
+            .position(|pair| pair == b"\r\n");
 
         if let Some(eol) = eol {
             let parsed = parse_line_fn(&input[..eol])?;
