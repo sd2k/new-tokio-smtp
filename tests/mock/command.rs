@@ -10,10 +10,6 @@ use self::Actor::*;
 
 use super::{mock, mock_no_shutdown};
 
-//fn server_id() -> ClientId {
-//    ClientId::Domain("they.test".parse().unwrap())
-//}
-
 fn client_id() -> ClientId {
     ClientId::Domain("me.test".parse().unwrap())
 }

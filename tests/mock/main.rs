@@ -18,6 +18,7 @@ use new_tokio_smtp::{Capability, Connection, Domain, EhloData, EsmtpKeyword, Io}
 
 mod chain;
 mod command;
+mod issue_05;
 #[cfg(feature = "send-mail")]
 mod send_mail;
 
