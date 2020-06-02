@@ -5,10 +5,7 @@ use futures::future::{self, Either, Future, Loop};
 use std::io as std_io;
 use std::sync::Arc;
 
-use crate::{
-    command, BoxedCmd, Connection,
-    error::LogicError,
-};
+use crate::{command, error::LogicError, BoxedCmd, Connection};
 
 /// creates a chain of commands and them to the given connection
 ///

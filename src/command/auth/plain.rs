@@ -4,10 +4,7 @@ use std::sync::Arc;
 
 use base64::encode;
 
-use crate::{
-    error::MissingCapabilities,
-    Cmd, EhloData, ExecFuture, Io,
-};
+use crate::{error::MissingCapabilities, Cmd, EhloData, ExecFuture, Io};
 
 use super::validate_auth_capability;
 

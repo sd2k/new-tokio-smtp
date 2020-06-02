@@ -4,10 +4,7 @@ use bytes::BufMut;
 use futures::{Async, Future, Poll};
 use tokio::io::AsyncRead;
 
-use crate::{
-    error::check_response,
-    response::parser,
-};
+use crate::{error::check_response, response::parser};
 
 use super::{Io, SmtpResult, INPUT_BUFFER_INC_SIZE};
 
@@ -56,9 +53,7 @@ impl Io {
     {
         let input = self.in_buffer();
 
-        let eol = (&*input)
-            .windows(2)
-            .position(|pair| pair == b"\r\n");
+        let eol = (&*input).windows(2).position(|pair| pair == b"\r\n");
 
         if let Some(eol) = eol {
             let parsed = parse_line_fn(&input[..eol])?;

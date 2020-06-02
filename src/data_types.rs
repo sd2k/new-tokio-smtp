@@ -308,7 +308,7 @@ pub enum SyntaxError {
     AddressLiteral {
         tag: String,
         value: String,
-        was_bad_tag: bool
+        was_bad_tag: bool,
     },
     EsmtpValue(String),
     EsmtpKeyword(String),
@@ -319,19 +319,32 @@ impl Display for SyntaxError {
         use self::SyntaxError::*;
         match self {
             Domain(bad_param) => write!(fter, "syntax error parsing Domain in {:?}", bad_param),
-            EhloParam(bad_param) => write!(fter, "syntax error parsing EhloParam in {:?}", bad_param),
-            EsmtpKeyword(bad_kw) => write!(fter, "syntax error parsing esmtp-keyword in {:?}", bad_kw),
-            EsmtpValue(bad_value) => write!(fter, "syntax error parsing esmtp-value in {:?}", bad_value),
-            AddressLiteral { tag, value, was_bad_tag} => {
+            EhloParam(bad_param) => {
+                write!(fter, "syntax error parsing EhloParam in {:?}", bad_param)
+            }
+            EsmtpKeyword(bad_kw) => {
+                write!(fter, "syntax error parsing esmtp-keyword in {:?}", bad_kw)
+            }
+            EsmtpValue(bad_value) => {
+                write!(fter, "syntax error parsing esmtp-value in {:?}", bad_value)
+            }
+            AddressLiteral {
+                tag,
+                value,
+                was_bad_tag,
+            } => {
                 let place = if *was_bad_tag { "tag" } else { "value" };
-                write!(fter, "syntax error parsing address-literal (malformed {}) in {:?}:{:?}", place, tag, value)
+                write!(
+                    fter,
+                    "syntax error parsing address-literal (malformed {}) in {:?}:{:?}",
+                    place, tag, value
+                )
             }
         }
     }
 }
 
 impl Error for SyntaxError {}
-
 
 impl AddressLiteral {
     /// Create a "general" AddressLiteral which is not IPv4/v6
@@ -362,7 +375,7 @@ impl AddressLiteral {
             return Err(SyntaxError::AddressLiteral {
                 tag: tag.into(),
                 value: custom_part.as_ref().into(),
-                was_bad_tag: true
+                was_bad_tag: true,
             });
         }
 
@@ -377,7 +390,7 @@ impl AddressLiteral {
             Err(SyntaxError::AddressLiteral {
                 tag: tag.into(),
                 value: custom_part.into(),
-                was_bad_tag: false
+                was_bad_tag: false,
             })
         }
     }

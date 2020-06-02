@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    Cmd, ExecFuture, Io,
     common::EhloData,
     data_types::{EsmtpKeyword, EsmtpValue, ForwardPath, ReversePath},
     error::MissingCapabilities,
+    Cmd, ExecFuture, Io,
 };
 
 /// Quit command, but as it makes the connection unusable we do

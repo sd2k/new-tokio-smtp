@@ -5,13 +5,13 @@ use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs};
 use futures::future::{self, Either, Future};
 
 use crate::{
+    command::Noop,
     common::{ClientId, DefaultTlsSetup, SetupTls, TlsConfig},
     connection::{Cmd, Connection},
     data_types::Domain,
     error::{ConnectingFailed, LogicError},
     future_ext::ResultWithContextExt,
     io::{Io, SmtpResult},
-    command::Noop,
 };
 
 /// A future resolving to an `Connection` instance

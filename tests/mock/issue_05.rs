@@ -1,9 +1,9 @@
 use futures::Future;
 
-use new_tokio_smtp::{command, ClientId};
-use new_tokio_smtp::mock::{ActionData, Actor};
 use self::ActionData::*;
 use self::Actor::*;
+use new_tokio_smtp::mock::{ActionData, Actor};
+use new_tokio_smtp::{command, ClientId};
 
 use super::mock;
 
@@ -60,4 +60,3 @@ fn normalified_ehlo_response() {
 
     con.shutdown().wait().unwrap();
 }
-

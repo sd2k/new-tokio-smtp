@@ -5,7 +5,7 @@ use std::{
     io as std_io,
 };
 
-use crate:: {
+use crate::{
     data_types::{Capability, EsmtpKeyword},
     response::Response,
 };
@@ -154,7 +154,10 @@ impl Display for LogicError {
             Custom(boxed) => Display::fmt(&boxed, fter),
             //FIXME print response code and error message!
             Code(_response) => write!(fter, "server responded with error response code"),
-            UnexpectedCode(_response) => write!(fter, "server responded with unexpected non-error response code"),
+            UnexpectedCode(_response) => write!(
+                fter,
+                "server responded with unexpected non-error response code"
+            ),
             //FIXME print which capabilities are missing
             MissingCapabilities(_caps) => write!(fter, "server is missing required capabilities"),
         }

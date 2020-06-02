@@ -6,11 +6,7 @@ use tokio::net::TcpStream;
 use tokio_tls::TlsStream;
 
 use super::ExecFuture;
-use crate::{
-    common::EhloData,
-    error::LogicError,
-    response::Response,
-};
+use crate::{common::EhloData, error::LogicError, response::Response};
 
 mod socket;
 pub use self::socket::*;

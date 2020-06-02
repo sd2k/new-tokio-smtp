@@ -3,11 +3,11 @@ use std::io as std_io;
 use futures::{future, Future};
 
 use new_tokio_smtp::{
-    command, Connection,
     chain::{HandleErrorInChain, OnError},
+    command,
     error::LogicError,
     mock::{ActionData, Actor},
-    smtp_chain
+    smtp_chain, Connection,
 };
 
 use self::ActionData::*;

@@ -6,10 +6,11 @@ use native_tls::TlsConnector as NativeTlsConnector;
 use tokio_tls::TlsConnector;
 
 use crate::{
-    map_tls_err, Capability, Cmd, DefaultTlsSetup, Domain, EhloData, EsmtpKeyword, ExecFuture, SetupTls,
     error::MissingCapabilities,
     io::{Io, Socket},
+    map_tls_err,
     response::{codes, Response},
+    Capability, Cmd, DefaultTlsSetup, Domain, EhloData, EsmtpKeyword, ExecFuture, SetupTls,
 };
 
 pub struct StartTls<S = DefaultTlsSetup> {

@@ -3,7 +3,6 @@
 #[cfg(not(feature = "mock-impl"))]
 compile_error!("integration tests require \"mock-impl\" feature");
 
-
 #[cfg(feature = "mock-impl")]
 mod chain;
 #[cfg(feature = "mock-impl")]
@@ -33,7 +32,6 @@ mod _main {
         let io: Io = MockSocket::new_no_check_shutdown(conv).into();
         Connection::from(io)
     }
-
 
     pub fn with_capability(con: Connection, cap: &str) -> Connection {
         let capability = Capability::from(EsmtpKeyword::from_str(cap).unwrap());

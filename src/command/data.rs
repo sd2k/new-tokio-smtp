@@ -3,14 +3,14 @@ use std::io as std_io;
 use bytes::{Buf, IntoBuf};
 use futures::{
     future::{self, Either, Future},
-    stream::{self, Stream}
+    stream::{self, Stream},
 };
 
 use crate::{
-    Cmd, EhloData, ExecFuture, Io,
     error::{LogicError, MissingCapabilities},
-    response::codes,
     future_ext::ResultWithContextExt,
+    response::codes,
+    Cmd, EhloData, ExecFuture, Io,
 };
 
 pub struct Data<S> {

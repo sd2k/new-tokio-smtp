@@ -10,7 +10,8 @@ use crate::{
 };
 
 /// future returned by `Cmd::exec`
-pub type ExecFuture = Box<dyn Future<Item = (Io, SmtpResult), Error = std_io::Error> + Send + 'static>;
+pub type ExecFuture =
+    Box<dyn Future<Item = (Io, SmtpResult), Error = std_io::Error> + Send + 'static>;
 
 /// The basic `Connection` type representing an (likely) open smtp connection
 ///

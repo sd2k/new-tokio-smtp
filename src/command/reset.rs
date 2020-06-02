@@ -3,9 +3,9 @@ use std::io as std_io;
 use futures::Future;
 
 use crate::{
-    Cmd, ExecFuture, Io,
     common::EhloData,
     error::{LogicError, MissingCapabilities},
+    Cmd, ExecFuture, Io,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

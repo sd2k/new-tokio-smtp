@@ -508,7 +508,8 @@ pub struct SendAllMails<I> {
     mails: I,
     con: Option<Connection>,
     //FIXME[rust/impl Trait in struct]
-    pending: Option<Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>>,
+    pending:
+        Option<Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>>,
 }
 
 impl<I, E> SendAllMails<I>
@@ -747,9 +748,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        command, Connection, ConnectionConfig,
-        error::GeneralError,
-        send_mail::MailEnvelop,
+        command, error::GeneralError, send_mail::MailEnvelop, Connection, ConnectionConfig,
     };
 
     fn assert_send(_: &impl Send) {}

@@ -1,7 +1,4 @@
-use crate::{
-    Cmd, EhloData, ExecFuture, Io,
-    error::MissingCapabilities,
-};
+use crate::{error::MissingCapabilities, Cmd, EhloData, ExecFuture, Io};
 
 /// An either of two commands
 ///

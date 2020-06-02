@@ -1,13 +1,12 @@
 use std::{collections::HashMap, io as std_io};
 
-use log::warn;
 use bytes::BufMut;
 use futures::Future;
+use log::warn;
 
 use crate::{
-    ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture, Io, Response, SyntaxError,
-    Capability,
-    error::MissingCapabilities
+    error::MissingCapabilities, Capability, ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture,
+    Io, Response, SyntaxError,
 };
 
 #[derive(Debug, Clone)]
@@ -86,7 +85,7 @@ fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
         match parse_capability_in_ehlo_response(line) {
             Ok((cap, params)) => {
                 caps.insert(cap, params);
-            },
+            }
             Err(err) => {
                 warn!("Parsing Server EHLO response partially failed: {}", err);
             }
@@ -96,7 +95,9 @@ fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
     Ok(EhloData::new(domain, caps))
 }
 
-fn parse_capability_in_ehlo_response(line: &str) -> Result<(Capability, Vec<EhloParam>), SyntaxError> {
+fn parse_capability_in_ehlo_response(
+    line: &str,
+) -> Result<(Capability, Vec<EhloParam>), SyntaxError> {
     let mut parts = line.split(" ");
     //UNWRAP_SAFE: Split has at last one entry
     let capability = parts.next().unwrap().parse()?;
@@ -111,10 +112,7 @@ mod test {
 
     mod parse_ehlo_response {
         use super::super::parse_ehlo_response;
-        use crate::{
-            response::codes::OK,
-            Response,
-        };
+        use crate::{response::codes::OK, Response};
 
         #[test]
         fn simple_case() {
