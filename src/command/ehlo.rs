@@ -7,7 +7,7 @@ use log_facade::warn;
 
 use crate::{
     error::MissingCapabilities, Capability, ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture,
-    Io, Response, SyntaxError, SyntaxErrorHandlingMethod,
+    Io, Response, SyntaxError, SyntaxErrorHandling,
 };
 
 #[derive(Debug, Clone)]
@@ -16,24 +16,24 @@ pub struct Ehlo {
     //FIXME: Move this into the connection as a form of
     //  "connection runtime settings" or similar. But this
     //  should wait until moving to async/await.
-    syntax_error_handling_method: SyntaxErrorHandlingMethod,
+    syntax_error_handling: SyntaxErrorHandling,
 }
 
 impl Ehlo {
     pub fn new(identity: ClientId) -> Self {
         Ehlo {
             identity,
-            syntax_error_handling_method: Default::default(),
+            syntax_error_handling: Default::default(),
         }
     }
 
-    pub fn with_syntax_error_handling_method(mut self, method: SyntaxErrorHandlingMethod) -> Self {
-        self.syntax_error_handling_method = method;
+    pub fn with_syntax_error_handling(mut self, method: SyntaxErrorHandling) -> Self {
+        self.syntax_error_handling = method;
         self
     }
 
-    pub fn syntax_error_handling_method(&self) -> &SyntaxErrorHandlingMethod {
-        &self.syntax_error_handling_method
+    pub fn syntax_error_handling(&self) -> &SyntaxErrorHandling {
+        &self.syntax_error_handling
     }
 
     pub fn identity(&self) -> &ClientId {
@@ -60,7 +60,7 @@ impl Cmd for Ehlo {
 
     fn exec(self, mut io: Io) -> ExecFuture {
         let error_on_bad_ehlo_capabilities =
-            self.syntax_error_handling_method() == &SyntaxErrorHandlingMethod::Strict;
+            self.syntax_error_handling() == &SyntaxErrorHandling::Strict;
         let str_me = match *self.identity() {
             ClientId::Domain(ref domain) => domain.as_str(),
             ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str(),
