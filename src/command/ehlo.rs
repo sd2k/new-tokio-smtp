@@ -6,17 +6,30 @@ use log::warn;
 
 use crate::{
     error::MissingCapabilities, Capability, ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture,
-    Io, Response, SyntaxError,
+    Io, Response, SyntaxError, SyntaxErrorHandlingMethod,
 };
 
 #[derive(Debug, Clone)]
 pub struct Ehlo {
     identity: ClientId,
+    //FIXME: Move this into the connection as a form of
+    //  "connection runtime settings" or similar. But this
+    //  should wait until moving to async/await.
+    syntax_error_handling_method: SyntaxErrorHandlingMethod,
 }
 
 impl Ehlo {
     pub fn new(identity: ClientId) -> Self {
-        Ehlo { identity }
+        Ehlo { identity, syntax_error_handling_method: Default::default() }
+    }
+
+    pub fn with_syntax_error_handling_method(mut self, method: SyntaxErrorHandlingMethod) -> Self {
+        self.syntax_error_handling_method = method;
+        self
+    }
+
+    pub fn syntax_error_handling_method(&self) -> &SyntaxErrorHandlingMethod {
+        &self.syntax_error_handling_method
     }
 
     pub fn identity(&self) -> &ClientId {
@@ -26,7 +39,7 @@ impl Ehlo {
 
 impl From<ClientId> for Ehlo {
     fn from(identity: ClientId) -> Self {
-        Ehlo { identity }
+        Ehlo::new(identity)
     }
 }
 
@@ -42,6 +55,7 @@ impl Cmd for Ehlo {
     }
 
     fn exec(self, mut io: Io) -> ExecFuture {
+        let error_on_bad_ehlo_capabilities = self.syntax_error_handling_method() == &SyntaxErrorHandlingMethod::Strict;
         let str_me = match *self.identity() {
             ClientId::Domain(ref domain) => domain.as_str(),
             ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str(),
@@ -59,10 +73,10 @@ impl Cmd for Ehlo {
             .flush()
             .and_then(Io::parse_response)
             //TODO ctx_and_then
-            .and_then(|(mut io, result)| match result {
+            .and_then(move |(mut io, result)| match result {
                 Err(response) => Ok((io, Err(response))),
                 Ok(response) => {
-                    let ehlo = parse_ehlo_response(&response)
+                    let ehlo = parse_ehlo_response(&response, error_on_bad_ehlo_capabilities)
                         .map_err(|err| std_io::Error::new(std_io::ErrorKind::Other, err))?;
 
                     io.set_ehlo_data(ehlo);
@@ -74,7 +88,7 @@ impl Cmd for Ehlo {
     }
 }
 
-fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
+fn parse_ehlo_response(response: &Response, error_on_bad_ehlo_capabilities: bool) -> Result<EhloData, SyntaxError> {
     let lines = response.msg();
     let first = lines.first().expect("response with 0 lines should not");
     //UNWRAP_SAFE: Split has at last one entry
@@ -86,6 +100,9 @@ fn parse_ehlo_response(response: &Response) -> Result<EhloData, SyntaxError> {
             Ok((cap, params)) => {
                 caps.insert(cap, params);
             }
+            Err(err) if error_on_bad_ehlo_capabilities => {
+                return Err(err);
+            },
             Err(err) => {
                 warn!("Parsing Server EHLO response partially failed: {}", err);
             }
@@ -117,7 +134,7 @@ mod test {
         #[test]
         fn simple_case() {
             let response = Response::new(OK, vec!["1aim.test".to_owned()]);
-            let ehlo_data = parse_ehlo_response(&response).unwrap();
+            let ehlo_data = parse_ehlo_response(&response, true).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert!(ehlo_data.capability_map().is_empty());
@@ -126,7 +143,7 @@ mod test {
         #[test]
         fn allow_greeting() {
             let response = Response::new(OK, vec!["1aim.test says hy".to_owned()]);
-            let ehlo_data = parse_ehlo_response(&response).unwrap();
+            let ehlo_data = parse_ehlo_response(&response, true).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert!(ehlo_data.capability_map().is_empty());
@@ -142,7 +159,7 @@ mod test {
                     "MIME8".to_owned(),
                 ],
             );
-            let ehlo_data = parse_ehlo_response(&response).unwrap();
+            let ehlo_data = parse_ehlo_response(&response, true).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert!(ehlo_data.has_capability("SMTPUTF8"));
@@ -164,7 +181,7 @@ mod test {
                     "X-NOT-A-ROBOT ENABLED".to_owned(),
                 ],
             );
-            let ehlo_data = parse_ehlo_response(&response).unwrap();
+            let ehlo_data = parse_ehlo_response(&response, true).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert!(ehlo_data.has_capability("X-NOT-A-ROBOT"));
@@ -183,7 +200,8 @@ mod test {
                     "X-NOT-A-ROBOT".to_owned(),
                 ],
             );
-            let ehlo_data = parse_ehlo_response(&response).unwrap();
+            let _err = parse_ehlo_response(&response, true).unwrap_err();
+            let ehlo_data = parse_ehlo_response(&response, false).unwrap();
 
             assert_eq!(ehlo_data.domain(), "1aim.test");
             assert_eq!(ehlo_data.capability_map().len(), 1);
@@ -207,7 +225,8 @@ mod test {
                     "DSN".to_owned(),
                 ],
             );
-            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+            let _ehlo_data = parse_ehlo_response(&response, false).unwrap();
+            let _err = parse_ehlo_response(&response, true).unwrap_err();
         }
 
         #[test]
@@ -226,7 +245,8 @@ mod test {
                     "DSN".to_owned(),
                 ],
             );
-            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+            let _ehlo_data = parse_ehlo_response(&response, false).unwrap();
+            let _ehlo_data = parse_ehlo_response(&response, true).unwrap();
         }
 
         #[test]
@@ -245,7 +265,7 @@ mod test {
                     "DSN".to_owned(),
                 ],
             );
-            let _ehlo_data = parse_ehlo_response(&response).unwrap();
+            let _ehlo_data = parse_ehlo_response(&response, true).unwrap();
         }
     }
 }

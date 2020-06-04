@@ -52,16 +52,17 @@ impl Connection {
             security,
             client_id,
             auth_cmd,
+            error_handling_method,
         } = config;
 
         #[allow(deprecated)]
         let con_fut = match security {
-            Security::None => Either::B(Either::A(Connection::_connect_insecure(&addr, client_id))),
+            Security::None => Either::B(Either::A(Connection::_connect_insecure(&addr, client_id, error_handling_method))),
             Security::DirectTls(tls_config) => Either::B(Either::B(
-                Connection::_connect_direct_tls(&addr, client_id, tls_config),
+                Connection::_connect_direct_tls(&addr, client_id, tls_config, error_handling_method),
             )),
             Security::StartTls(tls_config) => {
-                Either::A(Connection::_connect_starttls(&addr, client_id, tls_config))
+                Either::A(Connection::_connect_starttls(&addr, client_id, tls_config, error_handling_method))
             }
         };
 
@@ -109,12 +110,13 @@ impl Connection {
     pub fn _connect_insecure(
         addr: &SocketAddr,
         clid: ClientId,
+        syntax_error_handling: SyntaxErrorHandlingMethod,
     ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
         //Note: this has a circular dependency between Connection <-> cmd Ehlo which
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use crate::command::Ehlo;
-        let fut = Connection::_connect_insecure_no_ehlo(addr).and_then(|con| {
-            con.send(Ehlo::from(clid))
+        let fut = Connection::_connect_insecure_no_ehlo(addr).and_then(move |con| {
+            con.send(Ehlo::from(clid).with_syntax_error_handling_method(syntax_error_handling))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
         });
 
@@ -126,6 +128,7 @@ impl Connection {
         addr: &SocketAddr,
         clid: ClientId,
         config: TlsConfig<S>,
+        syntax_error_handling: SyntaxErrorHandlingMethod,
     ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
     where
         S: SetupTls,
@@ -134,7 +137,7 @@ impl Connection {
         // could be resolved using a ext. trait, but it's more ergonomic this way
         use crate::command::Ehlo;
         let fut = Connection::_connect_direct_tls_no_ehlo(addr, config).and_then(|con| {
-            con.send(Ehlo::from(clid))
+            con.send(Ehlo::from(clid).with_syntax_error_handling_method(syntax_error_handling))
                 .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup))
         });
 
@@ -146,6 +149,7 @@ impl Connection {
         addr: &SocketAddr,
         clid: ClientId,
         config: TlsConfig<S>,
+        syntax_error_handling: SyntaxErrorHandlingMethod,
     ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send
     where
         S: SetupTls,
@@ -155,7 +159,7 @@ impl Connection {
         use crate::command::{Ehlo, StartTls};
         let TlsConfig { domain, setup } = config;
 
-        let fut = Connection::_connect_insecure(&addr, clid.clone())
+        let fut = Connection::_connect_insecure(&addr, clid.clone(), syntax_error_handling.clone())
             .and_then(|con| {
                 con.send(StartTls {
                     setup_tls: setup,
@@ -163,7 +167,7 @@ impl Connection {
                 })
                 .map_err(ConnectingFailed::Io)
             })
-            .ctx_and_then(|con, _| con.send(Ehlo::from(clid)).map_err(ConnectingFailed::Io))
+            .ctx_and_then(move |con, _| con.send(Ehlo::from(clid).with_syntax_error_handling_method(syntax_error_handling)).map_err(ConnectingFailed::Io))
             .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup));
 
         fut
@@ -231,6 +235,37 @@ where
     /// for connecting to an MSA (e.g. thunderbird connecting to gmail)
     /// using localhost (`[127.0.0.1]`) is enough
     pub client_id: ClientId,
+
+    /// How strict error handling is done.
+    pub error_handling_method: SyntaxErrorHandlingMethod
+}
+
+/// Which method should be used to handle syntax errors.
+///
+//FIXME the way this integrates with the rest, especially how
+//  it is in effect during connection setup is far from optional.
+//  Furthermore it might be needed to be extended to handle other
+//  options like SecurityErrorHandling method and more. It's better
+//  to have some connection config _contained_ in IO from which this
+//  options are grabbed. But this is best done with other refactors,
+//  which make sense to be done best when porting to async/await.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd)]
+pub enum SyntaxErrorHandlingMethod {
+    /// More strict handling.
+    ///
+    /// (currently only affects the ehlo command during connection setup)
+    Strict,
+
+    /// Less strict handling.
+    ///
+    /// (currently only affects the ehlo command during connection setup)
+    Lax
+}
+
+impl Default for SyntaxErrorHandlingMethod {
+    fn default() -> Self {
+        SyntaxErrorHandlingMethod::Lax
+    }
 }
 
 impl<A> ConnectionConfig<A, DefaultTlsSetup>
@@ -254,6 +289,7 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
             client_id: None,
             port: DEFAULT_SMTP_MSA_PORT,
             auth_cmd: Noop,
+            error_handling_method: Default::default()
         }
     }
 
@@ -289,6 +325,7 @@ where
     client_id: Option<ClientId>,
     port: u16,
     auth_cmd: A,
+    error_handling_method: SyntaxErrorHandlingMethod
 }
 
 impl<A> LocalNonSecureBuilder<A>
@@ -316,12 +353,14 @@ where
             client_id,
             port,
             auth_cmd: _,
+            error_handling_method,
         } = self;
 
         LocalNonSecureBuilder {
             client_id,
             port,
             auth_cmd,
+            error_handling_method
         }
     }
 
@@ -331,6 +370,7 @@ where
             client_id,
             port,
             auth_cmd,
+            error_handling_method
         } = self;
 
         let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
@@ -345,6 +385,7 @@ where
             client_id,
             auth_cmd,
             security,
+            error_handling_method
         }
     }
 
@@ -367,6 +408,7 @@ where
     setup_tls: S,
     use_security: UseSecurity,
     auth_cmd: A,
+    error_handling_method: SyntaxErrorHandlingMethod,
 }
 
 impl ConnectionBuilder<Noop, DefaultTlsSetup> {
@@ -413,6 +455,7 @@ impl ConnectionBuilder<Noop, DefaultTlsSetup> {
             client_id: None,
             setup_tls: DefaultTlsSetup,
             auth_cmd: Noop,
+            error_handling_method: Default::default()
         }
     }
 }
@@ -441,6 +484,7 @@ where
             client_id,
             setup_tls: _,
             auth_cmd,
+            error_handling_method
         } = self;
 
         ConnectionBuilder {
@@ -450,6 +494,7 @@ where
             client_id,
             setup_tls: setup,
             auth_cmd,
+            error_handling_method
         }
     }
 
@@ -490,6 +535,7 @@ where
             client_id,
             setup_tls,
             auth_cmd: _,
+            error_handling_method,
         } = self;
 
         ConnectionBuilder {
@@ -499,6 +545,7 @@ where
             client_id,
             setup_tls,
             auth_cmd: auth_cmd,
+            error_handling_method
         }
     }
 
@@ -527,6 +574,7 @@ where
             client_id,
             setup_tls: setup,
             auth_cmd,
+            error_handling_method,
         } = self;
 
         let tls_config = TlsConfig { domain, setup };
@@ -542,6 +590,7 @@ where
             security,
             auth_cmd,
             client_id,
+            error_handling_method,
         }
     }
 
@@ -587,6 +636,7 @@ mod testd {
             security,
             auth_cmd,
             client_id,
+            error_handling_method
         } = cb.build();
 
         assert!((EXAMPLE_DOMAIN, DEFAULT_SMTP_MSA_PORT)
@@ -607,5 +657,7 @@ mod testd {
         } else {
             panic!("unexpected client id: {:?}", client_id);
         }
+
+        assert_eq!(error_handling_method, SyntaxErrorHandlingMethod::Lax);
     }
 }

@@ -328,6 +328,13 @@ Change Log
   - Now uses `rustfmt`.
   - Warn but not fail on un-parsable ehlo capability response lines
 
+- `v0.9.0` (pending)
+  - Some small API cleanup.
+  - Improvements to error handling for syntax errors.
+    - EHLO can now by default skip malformed response lines.
+    - this can somewhat be disabled
+    - such malformed lines can be logged
+
 
 Contributors
 -------------

@@ -56,7 +56,13 @@ impl ActionData {
                 let blob = &blob[..use_len];
                 //TODO better error message (assert_eq is a BAD idea here as
                 // it will flood the output)
-                assert!(blob == other, "unexpected data");
+                if blob != other {
+                    let blob = String::from_utf8_lossy(blob);
+                    let other = String::from_utf8_lossy(other);
+                    dbg!(blob);
+                    dbg!(other);
+                    panic!("unexpected data");
+                }
             }
             ActionData::Lines(ref lines) => {
                 let mut rem = other;
