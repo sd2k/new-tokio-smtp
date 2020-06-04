@@ -56,6 +56,8 @@ impl Io {
 
         if let Some(eol) = eol {
             let line = &input[..eol];
+            #[cfg(feature = "log")]
+            log_facade::trace!("S: {:?}", String::from_utf8_lossy(line));
             let parsed = parse_line_fn(line)?;
             input.advance(eol + 2);
             Ok(Some(parsed))

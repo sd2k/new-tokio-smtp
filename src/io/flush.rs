@@ -46,6 +46,18 @@ pub struct Flushing {
 
 impl Flushing {
     pub(crate) fn new(inner: Io) -> Self {
+        #[cfg(feature = "log")]
+        {
+            use log_facade::*; // This is needed due to something which is probably a rustc bug.
+            if log_enabled!(Level::Trace) {
+                let out = &inner.buffer.output[..];
+                let out = String::from_utf8_lossy(out);
+                for line in out.lines() {
+                    log_facade::trace!("C: {:?}", line);
+                }
+            }
+        }
+
         Flushing { inner: Some(inner) }
     }
 }

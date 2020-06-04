@@ -33,6 +33,7 @@ log-facade = { package="log", version="0.4", optional=true }
 
 [dev-dependencies]
 rpassword = "2.0"
+env_logger = "0.7"
 
 [badges]
 maintenance = { status = "passively-maintained" }

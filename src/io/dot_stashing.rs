@@ -18,6 +18,8 @@ impl Io {
         S: Stream<Error = std_io::Error>,
         S::Item: Buf,
     {
+        #[cfg(feature = "log")]
+        log_facade::trace!("C(writes body omitted):");
         DotStashedWrite::new(self, source)
     }
 }

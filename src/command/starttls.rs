@@ -134,6 +134,8 @@ where
                         .map(move |stream| {
                             let socket = Socket::Secure(stream);
                             let io = Io::from(socket);
+                            #[cfg(feature = "log")]
+                            log_facade::trace!("now using TLS");
                             (io, Ok(tls_done_result()))
                         });
 

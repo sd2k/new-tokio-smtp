@@ -19,6 +19,8 @@ struct Request {
 }
 
 fn main() {
+    env_logger::init();
+
     let Request { config, mails } = read_request();
     // We only have iter map overhead because we
     // don't have a failable mail encoding step, which normally is required.
