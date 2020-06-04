@@ -2,7 +2,8 @@ use std::{collections::HashMap, io as std_io};
 
 use bytes::BufMut;
 use futures::Future;
-use log::warn;
+#[cfg(feature="log")]
+use log_facade::warn;
 
 use crate::{
     error::MissingCapabilities, Capability, ClientId, Cmd, Domain, EhloData, EhloParam, ExecFuture,
@@ -103,8 +104,9 @@ fn parse_ehlo_response(response: &Response, error_on_bad_ehlo_capabilities: bool
             Err(err) if error_on_bad_ehlo_capabilities => {
                 return Err(err);
             },
-            Err(err) => {
-                warn!("Parsing Server EHLO response partially failed: {}", err);
+            Err(_err) => {
+                #[cfg(feature="log")]
+                warn!("Parsing Server EHLO response partially failed: {}", _err);
             }
         }
     }
