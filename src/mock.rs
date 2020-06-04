@@ -213,7 +213,7 @@ impl MockSocket {
     /// would requires using something similar to `quick check`
     pub fn maybe_inject_not_ready(&mut self) -> Poll<(), std_io::Error> {
         // 1/16 chance to be not ready
-        if random::<u8>() >= 240 {
+        if random::<u8>() >= 124 {
             self.schedule_delayed_wake();
             Ok(Async::NotReady)
         } else {
@@ -461,7 +461,7 @@ impl AsyncWrite for MockSocket {
     ///
     /// - Can always return with `NotReady` before doing anything.
     /// - panics if the state is `ServerIsWorking` or `ShutdownOrPoison`
-    /// - on `NeedNewAction` it advances the state to the next extion and
+    /// - on `NeedNewAction` it advances the state to the next action and
     ///   returns `NotReady` panicing if there is no new action
     /// - writes a random amount of passed in bytes (at last 1) to the
     ///   input buffer then returns `Ready` with the written byte count
@@ -487,8 +487,7 @@ impl AsyncWrite for MockSocket {
                 if input.remaining_mut() < amount {
                     input.reserve(amount)
                 }
-                let actual_write = buf.split_at(amount).0;
-                input.put(actual_write);
+                input.put(&buf[..amount]);
 
                 self.state = State::ClientIsWorking {
                     expected,
@@ -595,13 +594,12 @@ impl AsyncWrite for MockSocket {
 /// returns a random number in `[1; max_inclusive]`, where` max_inclusive` is the most likely value
 ///
 /// Note: `random_amount(0)` always returns 0, any other value returns a number
-/// between 1 and the value (inclusive).
+/// between 1 and the value (inclusive). With some slight bias to higher values.
 fn random_amount(max_inclusive: usize) -> usize {
-    // max is inclusive but gen_range would make it exclusive
-    let max_write = max_inclusive + 1;
     // make it more "likely" to write more stuff
     // (this is statistically horrible hack, but works fine here)
-    min(max_inclusive, thread_rng().gen_range(1, max_write + 16))
+    // (the +1 is to ofset the exclusiveness of gen_range and the 16 to have a slight bias for higher values)
+    min(max_inclusive, thread_rng().gen_range(1, max_inclusive + 1 + 16))
 }
 
 /// copies `from[..n]` to `to[..n]`
@@ -840,35 +838,38 @@ mod test {
                 (Client, Blob("quit\r\n".as_bytes().to_owned())),
             ]));
 
-            let buf = &mut [0u8, 0, 0, 0] as &mut [u8];
-            let mut expect = b"hy there\r\n" as &[u8];
 
-            let fut = future::poll_fn(move || -> Poll<Option<MockSocket>, std_io::Error> {
-                loop {
-                    let n = try_ready!(socket.as_mut().unwrap().poll_read(buf));
+            let fut = future::poll_fn({
+                let mut buf = Box::new([0u8, 0, 0, 0]) as Box<[u8]>;
+                let mut expect = b"hy there\r\n" as &[u8];
+                move || -> Poll<Option<MockSocket>, std_io::Error> {
+                    loop {
+                        let n = try_ready!(socket.as_mut().unwrap().poll_read(&mut buf));
 
-                    assert!(n > 0);
-                    let read = &buf[..n];
-                    let (use_expected, new_expected) = expect.split_at(n);
-                    expect = new_expected;
-                    assert_eq!(use_expected, read);
+                        assert!(n > 0);
+                        let read = &buf[..n];
+                        let (use_expected, new_expected) = expect.split_at(n);
+                        expect = new_expected;
+                        assert_eq!(use_expected, read);
 
-                    if expect.is_empty() {
-                        return Ok(Async::Ready(socket.take()));
+                        if expect.is_empty() {
+                            return Ok(Async::Ready(socket.take()));
+                        }
                     }
                 }
             })
             .and_then(|mut socket| {
-                future::poll_fn(move || {
+                future::poll_fn({
                     let mut bytes = Bytes::from("quit\r\n");
+                    move || {
+                        loop {
+                            let n = try_ready!(socket.as_mut().unwrap().poll_write(&bytes));
 
-                    loop {
-                        let n = try_ready!(socket.as_mut().unwrap().poll_write(&bytes));
-
-                        assert!(n > 0);
-                        bytes.advance(n);
-                        if bytes.is_empty() {
-                            return Ok(Async::Ready(socket.take()));
+                            assert!(n > 0);
+                            bytes.advance(n);
+                            if bytes.is_empty() {
+                                return Ok(Async::Ready(socket.take()));
+                            }
                         }
                     }
                 })
