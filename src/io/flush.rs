@@ -53,7 +53,14 @@ impl Flushing {
                 let out = &inner.buffer.output[..];
                 let out = String::from_utf8_lossy(out);
                 for line in out.lines() {
-                    log_facade::trace!("C: {:?}", line);
+                    if line.starts_with("AUTH") {
+                        let additional_chars_for_auth_subcommand =
+                            line[5..].bytes().position(|ch| ch == b' ').unwrap_or(0);
+                        let end = 5 + additional_chars_for_auth_subcommand;
+                        log_facade::trace!("C: {:?} <redacted>", &line[..end]);
+                    } else {
+                        log_facade::trace!("C: {:?}", line);
+                    }
                 }
             }
         }

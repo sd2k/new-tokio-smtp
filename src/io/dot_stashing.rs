@@ -19,7 +19,7 @@ impl Io {
         S::Item: Buf,
     {
         #[cfg(feature = "log")]
-        log_facade::trace!("C(writes body omitted):");
+        log_facade::trace!("C: <mail body redacted>");
         DotStashedWrite::new(self, source)
     }
 }
