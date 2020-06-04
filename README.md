@@ -330,10 +330,11 @@ Change Log
 
 - `v0.9.0` (pending)
   - Some small API cleanup.
-  - Improvements to error handling for syntax errors.
-    - EHLO can now by default skip malformed response lines.
-    - this can somewhat be disabled
-    - such malformed lines can be logged
+  - Made `log` and (default) feature. So if no log implementor is set up the
+    crate doesn't need to be compiled in.
+  - Made it configurable if bad EHLO capability response lines should trigger an
+    syntax error or be skipped (potentially logging the bad keyword/value).
+  - TODO: Added trace!/info! log commands.
 
 
 Contributors
