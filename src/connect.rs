@@ -57,13 +57,25 @@ impl Connection {
 
         #[allow(deprecated)]
         let con_fut = match security {
-            Security::None => Either::B(Either::A(Connection::_connect_insecure(&addr, client_id, error_handling_method))),
-            Security::DirectTls(tls_config) => Either::B(Either::B(
-                Connection::_connect_direct_tls(&addr, client_id, tls_config, error_handling_method),
-            )),
-            Security::StartTls(tls_config) => {
-                Either::A(Connection::_connect_starttls(&addr, client_id, tls_config, error_handling_method))
+            Security::None => Either::B(Either::A(Connection::_connect_insecure(
+                &addr,
+                client_id,
+                error_handling_method,
+            ))),
+            Security::DirectTls(tls_config) => {
+                Either::B(Either::B(Connection::_connect_direct_tls(
+                    &addr,
+                    client_id,
+                    tls_config,
+                    error_handling_method,
+                )))
             }
+            Security::StartTls(tls_config) => Either::A(Connection::_connect_starttls(
+                &addr,
+                client_id,
+                tls_config,
+                error_handling_method,
+            )),
         };
 
         let fut = con_fut.and_then(|con| {
@@ -167,7 +179,10 @@ impl Connection {
                 })
                 .map_err(ConnectingFailed::Io)
             })
-            .ctx_and_then(move |con, _| con.send(Ehlo::from(clid).with_syntax_error_handling_method(syntax_error_handling)).map_err(ConnectingFailed::Io))
+            .ctx_and_then(move |con, _| {
+                con.send(Ehlo::from(clid).with_syntax_error_handling_method(syntax_error_handling))
+                    .map_err(ConnectingFailed::Io)
+            })
             .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Setup));
 
         fut
@@ -237,7 +252,7 @@ where
     pub client_id: ClientId,
 
     /// How strict error handling is done.
-    pub error_handling_method: SyntaxErrorHandlingMethod
+    pub error_handling_method: SyntaxErrorHandlingMethod,
 }
 
 /// Which method should be used to handle syntax errors.
@@ -259,7 +274,7 @@ pub enum SyntaxErrorHandlingMethod {
     /// Less strict handling.
     ///
     /// (currently only affects the ehlo command during connection setup)
-    Lax
+    Lax,
 }
 
 impl Default for SyntaxErrorHandlingMethod {
@@ -289,7 +304,7 @@ impl ConnectionConfig<Noop, DefaultTlsSetup> {
             client_id: None,
             port: DEFAULT_SMTP_MSA_PORT,
             auth_cmd: Noop,
-            error_handling_method: Default::default()
+            error_handling_method: Default::default(),
         }
     }
 
@@ -325,7 +340,7 @@ where
     client_id: Option<ClientId>,
     port: u16,
     auth_cmd: A,
-    error_handling_method: SyntaxErrorHandlingMethod
+    error_handling_method: SyntaxErrorHandlingMethod,
 }
 
 impl<A> LocalNonSecureBuilder<A>
@@ -360,7 +375,7 @@ where
             client_id,
             port,
             auth_cmd,
-            error_handling_method
+            error_handling_method,
         }
     }
 
@@ -370,7 +385,7 @@ where
             client_id,
             port,
             auth_cmd,
-            error_handling_method
+            error_handling_method,
         } = self;
 
         let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
@@ -385,7 +400,7 @@ where
             client_id,
             auth_cmd,
             security,
-            error_handling_method
+            error_handling_method,
         }
     }
 
@@ -455,7 +470,7 @@ impl ConnectionBuilder<Noop, DefaultTlsSetup> {
             client_id: None,
             setup_tls: DefaultTlsSetup,
             auth_cmd: Noop,
-            error_handling_method: Default::default()
+            error_handling_method: Default::default(),
         }
     }
 }
@@ -484,7 +499,7 @@ where
             client_id,
             setup_tls: _,
             auth_cmd,
-            error_handling_method
+            error_handling_method,
         } = self;
 
         ConnectionBuilder {
@@ -494,7 +509,7 @@ where
             client_id,
             setup_tls: setup,
             auth_cmd,
-            error_handling_method
+            error_handling_method,
         }
     }
 
@@ -545,7 +560,7 @@ where
             client_id,
             setup_tls,
             auth_cmd: auth_cmd,
-            error_handling_method
+            error_handling_method,
         }
     }
 
@@ -636,7 +651,7 @@ mod testd {
             security,
             auth_cmd,
             client_id,
-            error_handling_method
+            error_handling_method,
         } = cb.build();
 
         assert!((EXAMPLE_DOMAIN, DEFAULT_SMTP_MSA_PORT)

@@ -4,9 +4,8 @@ use bytes::BufMut;
 use futures::{Async, Future, Poll};
 use tokio::io::AsyncRead;
 
-use crate::{error::check_response, response::parser};
-
 use super::{Io, SmtpResult, INPUT_BUFFER_INC_SIZE};
+use crate::{error::check_response, response::parser};
 
 impl Io {
     /// parse a "normal" smtp response
@@ -56,7 +55,9 @@ impl Io {
         let eol = (&*input).windows(2).position(|pair| pair == b"\r\n");
 
         if let Some(eol) = eol {
-            let parsed = parse_line_fn(&input[..eol])?;
+            let line = &input[..eol];
+            trace!("S: {:?}", String::from_utf8_lossy(line));
+            let parsed = parse_line_fn(line)?;
             input.advance(eol + 2);
             Ok(Some(parsed))
         } else {

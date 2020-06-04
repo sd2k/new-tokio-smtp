@@ -599,7 +599,10 @@ fn random_amount(max_inclusive: usize) -> usize {
     // make it more "likely" to write more stuff
     // (this is statistically horrible hack, but works fine here)
     // (the +1 is to ofset the exclusiveness of gen_range and the 16 to have a slight bias for higher values)
-    min(max_inclusive, thread_rng().gen_range(1, max_inclusive + 1 + 16))
+    min(
+        max_inclusive,
+        thread_rng().gen_range(1, max_inclusive + 1 + 16),
+    )
 }
 
 /// copies `from[..n]` to `to[..n]`
@@ -838,7 +841,6 @@ mod test {
                 (Client, Blob("quit\r\n".as_bytes().to_owned())),
             ]));
 
-
             let fut = future::poll_fn({
                 let mut buf = Box::new([0u8, 0, 0, 0]) as Box<[u8]>;
                 let mut expect = b"hy there\r\n" as &[u8];
@@ -861,15 +863,13 @@ mod test {
             .and_then(|mut socket| {
                 future::poll_fn({
                     let mut bytes = Bytes::from("quit\r\n");
-                    move || {
-                        loop {
-                            let n = try_ready!(socket.as_mut().unwrap().poll_write(&bytes));
+                    move || loop {
+                        let n = try_ready!(socket.as_mut().unwrap().poll_write(&bytes));
 
-                            assert!(n > 0);
-                            bytes.advance(n);
-                            if bytes.is_empty() {
-                                return Ok(Async::Ready(socket.take()));
-                            }
+                        assert!(n > 0);
+                        bytes.advance(n);
+                        if bytes.is_empty() {
+                            return Ok(Async::Ready(socket.take()));
                         }
                     }
                 })

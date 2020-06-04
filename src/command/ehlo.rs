@@ -2,7 +2,7 @@ use std::{collections::HashMap, io as std_io};
 
 use bytes::BufMut;
 use futures::Future;
-#[cfg(feature="log")]
+#[cfg(feature = "log")]
 use log_facade::warn;
 
 use crate::{
@@ -21,7 +21,10 @@ pub struct Ehlo {
 
 impl Ehlo {
     pub fn new(identity: ClientId) -> Self {
-        Ehlo { identity, syntax_error_handling_method: Default::default() }
+        Ehlo {
+            identity,
+            syntax_error_handling_method: Default::default(),
+        }
     }
 
     pub fn with_syntax_error_handling_method(mut self, method: SyntaxErrorHandlingMethod) -> Self {
@@ -56,7 +59,8 @@ impl Cmd for Ehlo {
     }
 
     fn exec(self, mut io: Io) -> ExecFuture {
-        let error_on_bad_ehlo_capabilities = self.syntax_error_handling_method() == &SyntaxErrorHandlingMethod::Strict;
+        let error_on_bad_ehlo_capabilities =
+            self.syntax_error_handling_method() == &SyntaxErrorHandlingMethod::Strict;
         let str_me = match *self.identity() {
             ClientId::Domain(ref domain) => domain.as_str(),
             ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str(),
@@ -89,7 +93,10 @@ impl Cmd for Ehlo {
     }
 }
 
-fn parse_ehlo_response(response: &Response, error_on_bad_ehlo_capabilities: bool) -> Result<EhloData, SyntaxError> {
+fn parse_ehlo_response(
+    response: &Response,
+    error_on_bad_ehlo_capabilities: bool,
+) -> Result<EhloData, SyntaxError> {
     let lines = response.msg();
     let first = lines.first().expect("response with 0 lines should not");
     //UNWRAP_SAFE: Split has at last one entry
@@ -103,9 +110,9 @@ fn parse_ehlo_response(response: &Response, error_on_bad_ehlo_capabilities: bool
             }
             Err(err) if error_on_bad_ehlo_capabilities => {
                 return Err(err);
-            },
+            }
             Err(_err) => {
-                #[cfg(feature="log")]
+                #[cfg(feature = "log")]
                 warn!("Parsing Server EHLO response partially failed: {}", _err);
             }
         }
