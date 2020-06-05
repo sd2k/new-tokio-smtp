@@ -180,6 +180,54 @@ this might be fixed in the future with cargo
 supporting "for testing only default features"
 or similar.
 
+Debugging SMTP
+---------------
+
+If the log (default) feature is enabled and
+the log level is set to trace then the whole
+client/server interaction is logged.
+
+Any line the server sends is logged after
+receiving it and before parsing it and
+any line the client sends is logged before
+sending it (before flushing).
+
+The exception is that send mail bodies are
+not logged. Furthermore for any line the client
+send starting with "AUTH" everything except the
+next word will be redacted to prevent logging
+passwords, access tokens and similar. For
+example in case of auth plain login only
+`"AUTH PLAIN <redacted>"` will be logged.
+
+This still means that when using trace logging
+following thinks will still be logged:
+
+- client id
+- server id
+- server greeting message (can contain the
+  client ip or DNS name depending on the
+  server you connect to).
+- sending mail address
+- all receiving mail addresses
+
+Given that trace logging should only be enabled
+for debugging purpose this isn't a problem even
+with GDPR. If you still do set it up so that it's not enabled for this crate. E.g. with env_logger it would be something like `RUST_LOG="new_tokio_smtp=warn,trace" to enabled trace logging for all places but smtp. But you can
+easily run into GDPR incompatibility as this likely
+would log e.g. IP addresses of connecting clients
+and similar.
+
+Note that trace logging does imply a performance
+overhead above just writing to the log as the
+trace logging is done on a low level where not
+string but bytes are handled and as such they
+have to be converted back to an string additional
+each command line (not mail msg) the client send
+needs to be checked to see if it's starts with AUTH
+and needs to be redacted, etc.
+
+
 Concept
 --------
 
@@ -334,7 +382,7 @@ Change Log
     crate doesn't need to be compiled in.
   - Made it configurable if bad EHLO capability response lines should trigger an
     syntax error or be skipped (potentially logging the bad keyword/value).
-  - TODO: Added trace!/info! log commands.
+  - Added trace level logging to log the whole server conversation except mail bodies and passwords.
 
 
 Contributors
