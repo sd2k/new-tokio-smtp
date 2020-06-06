@@ -96,9 +96,9 @@ where
     type Error = P::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let (ctx, result) = match self.state {
-            State::Parent(ref mut p) => try_ready!(p.poll()),
-            State::Intermediate(ref mut im) => {
+        let (ctx, result) = match &mut self.state {
+            State::Parent(p) => try_ready!(p.poll()),
+            State::Intermediate(im) => {
                 return im.poll();
             }
         };
@@ -139,9 +139,9 @@ where
     type Error = P::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let (ctx, result) = match self.state {
-            State::Parent(ref mut p) => try_ready!(p.poll()),
-            State::Intermediate(ref mut im) => {
+        let (ctx, result) = match &mut self.state {
+            State::Parent(p) => try_ready!(p.poll()),
+            State::Intermediate(im) => {
                 return im.poll();
             }
         };

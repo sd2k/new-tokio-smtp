@@ -25,6 +25,11 @@
 //! Extend the `Socket` abstraction to include a mock socket additional to `Tcp`, `TcpTls`.
 //! Also provides a mock socket implementation for simply testing commands. Custom implementations
 //! can be provided too if needed for testing
+//!
+
+// I use `{ ...; let fut = ...long multi line; fut }` a lot for better readability.
+// it also makes it so much easier to wrap the return value into a `dbg!`, `Box::new` and similar.
+#![allow(clippy::let_and_return)]
 
 #[macro_use]
 extern crate futures;

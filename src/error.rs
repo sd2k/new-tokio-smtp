@@ -20,10 +20,10 @@ pub enum GeneralError {
 impl Display for GeneralError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::GeneralError::*;
-        match *self {
-            Connecting(ref err) => write!(fter, "Connecting failed: {}", err),
-            Cmd(ref err) => write!(fter, "A command failed: {}", err),
-            Io(ref err) => write!(fter, "I/O-Error: {}", err),
+        match self {
+            Connecting(err) => write!(fter, "Connecting failed: {}", err),
+            Cmd(err) => write!(fter, "A command failed: {}", err),
+            Io(err) => write!(fter, "I/O-Error: {}", err),
         }
     }
 }
@@ -74,10 +74,10 @@ impl Error for ConnectingFailed {
 
     fn cause(&self) -> Option<&dyn Error> {
         use self::ConnectingFailed::*;
-        match *self {
-            Io(ref err) => Some(err),
-            Setup(ref err) => Some(err),
-            Auth(ref err) => Some(err),
+        match self {
+            Io(err) => Some(err),
+            Setup(err) => Some(err),
+            Auth(err) => Some(err),
         }
     }
 }
@@ -85,10 +85,10 @@ impl Error for ConnectingFailed {
 impl Display for ConnectingFailed {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::ConnectingFailed::*;
-        match *self {
-            Io(ref err) => write!(fter, "I/O-Error: {}", err),
-            Setup(ref err) => write!(fter, "Setup-Error: {}", err),
-            Auth(ref err) => write!(fter, "Authentication-Error: {}", err),
+        match self {
+            Io(err) => write!(fter, "I/O-Error: {}", err),
+            Setup(err) => write!(fter, "Setup-Error: {}", err),
+            Auth(err) => write!(fter, "Authentication-Error: {}", err),
         }
     }
 }
@@ -139,8 +139,8 @@ impl From<MissingCapabilities> for LogicError {
 impl Error for LogicError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         use self::LogicError::*;
-        match *self {
-            Custom(ref boxed) => boxed.source(),
+        match self {
+            Custom(boxed) => boxed.source(),
             _ => None,
         }
     }

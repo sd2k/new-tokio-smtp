@@ -186,7 +186,7 @@ impl From<TlsStream<TcpStream>> for Io {
 }
 
 /// represents the buffers of an smtp connection
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Buffers {
     /// write data from socket to input then parse
     pub input: BytesMut,

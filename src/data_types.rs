@@ -186,7 +186,7 @@ impl FromStr for EhloParam {
         let valid = inp.bytes().all(|bch| 33 <= bch && bch <= 126);
 
         if valid {
-            Ok(EhloParam(inp.to_owned().into()))
+            Ok(EhloParam(inp.into()))
         } else {
             Err(SyntaxError::EhloParam(inp.into()))
         }
@@ -217,7 +217,7 @@ impl EsmtpKeyword {
             val.make_ascii_uppercase();
             Ok(EsmtpKeyword(val.into()))
         } else {
-            Err(SyntaxError::EsmtpKeyword(val.into()))
+            Err(SyntaxError::EsmtpKeyword(val))
         }
     }
 }
@@ -246,7 +246,7 @@ impl EsmtpValue {
             .all(|bch| 33 <= bch && (bch <= 60 || (62 <= bch && bch <= 128)));
 
         if valid {
-            Ok(EsmtpValue(val.into()))
+            Ok(EsmtpValue(val))
         } else {
             Err(SyntaxError::EsmtpValue(val))
         }
@@ -280,7 +280,7 @@ impl FromStr for Domain {
     type Err = SyntaxError;
 
     fn from_str(inp: &str) -> Result<Self, Self::Err> {
-        let valid = inp.split(".").all(validate_subdomain);
+        let valid = inp.split('.').all(validate_subdomain);
 
         if valid {
             Ok(Domain(inp.to_lowercase().into()))
@@ -400,8 +400,8 @@ impl From<IpAddr> for AddressLiteral {
     fn from(addr: IpAddr) -> Self {
         use self::IpAddr::*;
         match addr {
-            V4(ref addr) => AddressLiteral::from(addr),
-            V6(ref addr) => AddressLiteral::from(addr),
+            V4(addr) => AddressLiteral::from(addr),
+            V6(addr) => AddressLiteral::from(addr),
         }
     }
 }

@@ -29,22 +29,22 @@ pub enum Socket {
 impl Socket {
     /// true if it's a `TlsStream` (or if mock says so)
     pub fn is_secure(&self) -> bool {
-        match *self {
+        match self {
             Socket::Secure(_) => true,
             Socket::Insecure(_) => false,
             #[cfg(feature = "mock-support")]
-            Socket::Mock(ref mock) => mock.is_secure(),
+            Socket::Mock(mock) => mock.is_secure(),
         }
     }
 }
 
 macro_rules! socket_mux {
     ($self:ident, |$socket:ident| $block:block) => {{
-        match *$self {
-            Socket::Secure(ref mut $socket) => $block,
-            Socket::Insecure(ref mut $socket) => $block,
+        match $self {
+            Socket::Secure($socket) => $block,
+            Socket::Insecure($socket) => $block,
             #[cfg(feature = "mock-support")]
-            Socket::Mock(ref mut $socket) => $block,
+            Socket::Mock($socket) => $block,
         }
     }};
 }
@@ -74,11 +74,11 @@ impl std_io::Write for Socket {
 impl AsyncRead for Socket {
     #[inline]
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        match *self {
-            Socket::Secure(ref socket) => socket.prepare_uninitialized_buffer(buf),
-            Socket::Insecure(ref socket) => socket.prepare_uninitialized_buffer(buf),
+        match self {
+            Socket::Secure(socket) => socket.prepare_uninitialized_buffer(buf),
+            Socket::Insecure(socket) => socket.prepare_uninitialized_buffer(buf),
             #[cfg(feature = "mock-support")]
-            Socket::Mock(ref socket) => socket.prepare_uninitialized_buffer(buf),
+            Socket::Mock(socket) => socket.prepare_uninitialized_buffer(buf),
         }
     }
 

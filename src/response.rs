@@ -45,27 +45,27 @@ pub struct ResponseCode([u8; 3]);
 
 impl ResponseCode {
     /// true if the code starts with `2`
-    pub fn is_positive(&self) -> bool {
+    pub fn is_positive(self) -> bool {
         self.0[0] == b'2'
     }
 
     /// true if the code starts with `3`
-    pub fn is_intermediate(&self) -> bool {
+    pub fn is_intermediate(self) -> bool {
         self.0[0] == b'3'
     }
 
     /// true if the code starts with `4`
-    pub fn is_transient_failure(&self) -> bool {
+    pub fn is_transient_failure(self) -> bool {
         self.0[0] == b'4'
     }
 
     /// true if the code starts with `5`
-    pub fn is_permanent_failure(&self) -> bool {
+    pub fn is_permanent_failure(self) -> bool {
         self.0[0] == b'5'
     }
 
     /// true if the code doesn't start with `2` or `3`
-    pub fn is_erroneous(&self) -> bool {
+    pub fn is_erroneous(self) -> bool {
         !self.is_positive() && !self.is_intermediate()
     }
 
@@ -75,7 +75,7 @@ impl ResponseCode {
     /// in ascii characters. It's *not* a triplet of the
     /// ascii characters converted to integer numbers!
     //FIXME rename to as_ascii_bytes
-    pub fn as_byte_string(&self) -> [u8; 3] {
+    pub fn as_byte_string(self) -> [u8; 3] {
         self.0
     }
 }
@@ -221,7 +221,6 @@ pub mod parser {
 /// command documentation starting with "RFC XXX;" is not quoted.
 /// In case of "RFC 5321:" the quotes come from Section 4.2.3.
 pub mod codes {
-    #[allow(non_snake_case)]
     use super::ResponseCode;
 
     /// RFC 5321: System status, or system help reply

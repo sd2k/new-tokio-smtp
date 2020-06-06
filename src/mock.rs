@@ -39,9 +39,9 @@ impl ActionData {
     /// In case of `ActionData::Lines` the implied `"\r\n"` line
     /// endings are added into the length (i.e. len +2 for each line).
     pub fn len(&self) -> usize {
-        match *self {
-            ActionData::Blob(ref blob) => blob.len(),
-            ActionData::Lines(ref lines) => {
+        match self {
+            ActionData::Blob(blob) => blob.len(),
+            ActionData::Lines(lines) => {
                 //MAGIC_NUM: +2 = "\r\n".len()
                 lines.iter().map(|ln| ln.len() + 2).sum()
             }
@@ -49,8 +49,8 @@ impl ActionData {
     }
 
     pub fn assert_same_start(&self, other: &[u8]) {
-        match *self {
-            ActionData::Blob(ref blob) => {
+        match self {
+            ActionData::Blob(blob) => {
                 let use_len = min(blob.len(), other.len());
                 let other = &other[..use_len];
                 let blob = &blob[..use_len];
@@ -64,7 +64,7 @@ impl ActionData {
                     panic!("unexpected data");
                 }
             }
-            ActionData::Lines(ref lines) => {
+            ActionData::Lines(lines) => {
                 let mut rem = other;
                 for line in lines.iter() {
                     let use_len = min(line.len(), rem.len());
@@ -134,10 +134,10 @@ enum State {
 
 impl State {
     fn waker(&self) -> &Waker {
-        match *self {
-            State::ServerIsWorking { ref waker, .. } => waker,
-            State::ClientIsWorking { ref waker, .. } => waker,
-            State::NeedNewAction { ref waker, .. } => waker,
+        match self {
+            State::ServerIsWorking { waker, .. } => waker,
+            State::ClientIsWorking { waker, .. } => waker,
+            State::NeedNewAction { waker, .. } => waker,
             _ => panic!("trying to schedule wake up on shutdown stream"),
         }
     }

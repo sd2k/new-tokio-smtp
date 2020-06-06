@@ -613,7 +613,7 @@ where
                     Ok(Async::Ready((con, result))) => {
                         self.con = Some(con);
                         match result {
-                            Ok(res) => Ok(Async::Ready(Some(res))),
+                            Ok(()) => Ok(Async::Ready(Some(()))),
                             Err((_idx, err)) => Err(E::from(GeneralError::from(err))),
                         }
                     }
@@ -713,7 +713,7 @@ where
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            let is_done = if let &mut CompletionState::Pending(ref mut fut) = &mut self.state {
+            let is_done = if let CompletionState::Pending(fut) = &mut self.state {
                 if let Ok(Async::NotReady) = fut.poll() {
                     return Ok(Async::NotReady);
                 } else {

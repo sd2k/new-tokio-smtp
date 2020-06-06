@@ -58,7 +58,8 @@ fn connection_already_secure_error_future() -> ExecFuture {
         std_io::ErrorKind::AlreadyExists,
         "connection is already TLS encrypted",
     ));
-    return Box::new(fut);
+
+    Box::new(fut)
 }
 
 const STARTTLS: &str = "STARTTLS";
@@ -87,13 +88,13 @@ where
             setup_tls,
         } = self;
 
-        let was_mock = match *io.socket_mut() {
+        let was_mock = match io.socket_mut() {
             Socket::Insecure(_) => false,
             Socket::Secure(_) => {
                 return connection_already_secure_error_future();
             }
             #[cfg(feature = "mock-support")]
-            Socket::Mock(ref mut socket_mock) => {
+            Socket::Mock(socket_mock) => {
                 if socket_mock.is_secure() {
                     return connection_already_secure_error_future();
                 } else {

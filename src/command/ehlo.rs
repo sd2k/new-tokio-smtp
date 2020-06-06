@@ -61,9 +61,9 @@ impl Cmd for Ehlo {
     fn exec(self, mut io: Io) -> ExecFuture {
         let error_on_bad_ehlo_capabilities =
             self.syntax_error_handling() == &SyntaxErrorHandling::Strict;
-        let str_me = match *self.identity() {
-            ClientId::Domain(ref domain) => domain.as_str(),
-            ClientId::AddressLiteral(ref addr_lit) => addr_lit.as_str(),
+        let str_me = match self.identity() {
+            ClientId::Domain(domain) => domain.as_str(),
+            ClientId::AddressLiteral(addr_lit) => addr_lit.as_str(),
         };
 
         {
@@ -100,7 +100,7 @@ fn parse_ehlo_response(
     let lines = response.msg();
     let first = lines.first().expect("response with 0 lines should not");
     //UNWRAP_SAFE: Split has at last one entry
-    let domain: Domain = first.split(" ").next().unwrap().parse()?;
+    let domain: Domain = first.split(' ').next().unwrap().parse()?;
     let mut caps = HashMap::new();
 
     for line in lines[1..].iter() {
@@ -124,7 +124,7 @@ fn parse_ehlo_response(
 fn parse_capability_in_ehlo_response(
     line: &str,
 ) -> Result<(Capability, Vec<EhloParam>), SyntaxError> {
-    let mut parts = line.split(" ");
+    let mut parts = line.split(' ');
     //UNWRAP_SAFE: Split has at last one entry
     let capability = parts.next().unwrap().parse()?;
     let params = parts

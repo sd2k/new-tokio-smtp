@@ -31,7 +31,7 @@ where
 {
     let fut = match res {
         Err(err) => Either::A(future::err(err.into())),
-        Ok((con, Ok(_resp))) => Either::A(future::ok(con.into())),
+        Ok((con, Ok(_resp))) => Either::A(future::ok(con)),
         Ok((con, Err(err))) => Either::B(con.quit().then(|_| Err(new_logic_err(err)))),
     };
 
@@ -197,7 +197,7 @@ where
 {
     /// use a plain non encrypted connection
     #[deprecated(
-        since = "0.0",
+        since = "0.0.0",
         note = "it's strongly discourage to use unencrypted connections for private information/auth etc."
     )]
     None,
@@ -396,7 +396,7 @@ where
             syntax_error_handling,
         } = self;
 
-        let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
+        let client_id = client_id.unwrap_or_else(ClientId::hostname);
 
         let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), port);
 
@@ -567,7 +567,7 @@ where
             use_security,
             client_id,
             setup_tls,
-            auth_cmd: auth_cmd,
+            auth_cmd,
             syntax_error_handling,
         }
     }
@@ -614,7 +614,7 @@ where
             UseSecurity::DirectTls => Security::DirectTls(tls_config),
         };
 
-        let client_id = client_id.unwrap_or_else(|| ClientId::hostname());
+        let client_id = client_id.unwrap_or_else(ClientId::hostname);
 
         ConnectionConfig {
             addr,

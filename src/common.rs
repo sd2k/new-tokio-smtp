@@ -50,7 +50,7 @@ impl ClientId {
     /// If this fails `ClientId::localhost()` is used.
     ///
     pub fn hostname() -> Self {
-        Self::try_hostname().unwrap_or_else(|| Self::localhost())
+        Self::try_hostname().unwrap_or_else(Self::localhost)
     }
 
     /// creates a client identity if a hostname can be found
@@ -161,7 +161,10 @@ macro_rules! alttry {
         let func = move || -> Result<_, _> { $block };
         match func() {
             Ok(ok) => ok,
-            Err(err) => return ($emap)(err),
+            Err(err) => {
+                #[allow(clippy::redundant_closure_call)]
+                return ($emap)(err);
+            },
         }
     }};
 }
