@@ -1,12 +1,6 @@
-extern crate futures;
-extern crate new_tokio_smtp;
-extern crate tokio;
-#[macro_use]
-extern crate vec1;
-extern crate rpassword;
-
 use std::io::{stdin, stdout, Write};
 
+use vec1::vec1;
 use futures::future::lazy;
 use futures::stream::Stream;
 use new_tokio_smtp::error::GeneralError;
