@@ -39,6 +39,10 @@ env_logger = "0.7"
 name = "readme"
 required-features = ["send-mail"]
 
+[[test]]
+name = "mock"
+required-features = ["mock-impl"]
+
 
 [badges]
 maintenance = { status = "passively-maintained" }
