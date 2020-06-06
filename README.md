@@ -376,7 +376,7 @@ Change Log
   - Now uses `rustfmt`.
   - Warn but not fail on un-parsable ehlo capability response lines
 
-- `v0.9.0` (pending)
+- `v0.9.0`
   - Some small API cleanup.
   - Made `log` and (default) feature. So if no log implementor is set up the
     crate doesn't need to be compiled in.
