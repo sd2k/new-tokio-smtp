@@ -155,12 +155,10 @@ impl Future for Parsing {
         //3. if not see if the socked was closed
         match state {
             ReadState::NotReady => Ok(Async::NotReady),
-            ReadState::SocketClosed => {
-                Err(std_io::Error::new(
-                    std_io::ErrorKind::ConnectionAborted,
-                    "socked closed before getting full smtp response",
-                ))
-            }
+            ReadState::SocketClosed => Err(std_io::Error::new(
+                std_io::ErrorKind::ConnectionAborted,
+                "socked closed before getting full smtp response",
+            )),
         }
     }
 }

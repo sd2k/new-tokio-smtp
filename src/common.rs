@@ -164,7 +164,7 @@ macro_rules! alttry {
             Err(err) => {
                 #[allow(clippy::redundant_closure_call)]
                 return ($emap)(err);
-            },
+            }
         }
     }};
 }

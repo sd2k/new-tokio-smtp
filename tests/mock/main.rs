@@ -4,7 +4,6 @@ mod issue_05;
 #[cfg(feature = "send-mail")]
 mod send_mail;
 
-
 use std::collections::HashMap;
 use std::str::FromStr;
 

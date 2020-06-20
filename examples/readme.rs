@@ -1,11 +1,11 @@
 use std::io::{stdin, stdout, Write};
 
-use vec1::vec1;
 use futures::future::lazy;
 use futures::stream::Stream;
 use new_tokio_smtp::error::GeneralError;
 use new_tokio_smtp::send_mail::{EncodingRequirement, Mail, MailAddress, MailEnvelop};
 use new_tokio_smtp::{command, Connection, ConnectionConfig, Domain};
+use vec1::vec1;
 
 struct Request {
     config: ConnectionConfig<command::auth::Plain>,
