@@ -78,22 +78,10 @@ impl Connection {
             )),
         };
 
-        let fut = con_fut
-            .then(move |res| {
-                #[cfg(feature = "log")]
-                {
-                    if let Err(err) = &res {
-                        log_facade::trace!("Connecting to {} failed: {}", addr, err)
-                    } else {
-                        log_facade::trace!("Connected to {}", addr)
-                    }
-                }
-                res
-            })
-            .and_then(|con| {
-                con.send(auth_cmd)
-                    .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
-            });
+        let fut = con_fut.and_then(|con| {
+            con.send(auth_cmd)
+                .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
+        });
 
         fut
     }
@@ -102,7 +90,22 @@ impl Connection {
     pub fn _connect_insecure_no_ehlo(
         addr: &SocketAddr,
     ) -> impl Future<Item = Connection, Error = ConnectingFailed> + Send {
+        //FIXME accept SocketAddr instead, but this would brake the API, make more of the API internal!
+        #[cfg(feature = "log")]
+        let _addr = addr.clone();
+
         let fut = Io::connect_insecure(addr)
+            .then(move |res| {
+                #[cfg(feature = "log")]
+                {
+                    if let Err(err) = &res {
+                        log_facade::trace!("Connecting to {} failed: {}", _addr, err)
+                    } else {
+                        log_facade::trace!("Connected to {}", _addr)
+                    }
+                }
+                res
+            })
             .and_then(Io::parse_response)
             .then(|res| {
                 let res = res.map(|(io, res)| (Connection::from(io), res));
@@ -120,7 +123,22 @@ impl Connection {
     where
         S: SetupTls,
     {
+        //FIXME accept SocketAddr instead, but this would brake the API, make more of the API internal!
+        #[cfg(feature = "log")]
+        let _addr = addr.clone();
+
         let fut = Io::connect_secure(addr, config)
+            .then(move |res| {
+                #[cfg(feature = "log")]
+                {
+                    if let Err(err) = &res {
+                        log_facade::trace!("Connecting to {} failed: {}", _addr, err)
+                    } else {
+                        log_facade::trace!("Connected to {}", _addr)
+                    }
+                }
+                res
+            })
             .and_then(Io::parse_response)
             .then(|res| {
                 let res = res.map(|(io, res)| (Connection::from(io), res));
