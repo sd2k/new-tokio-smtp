@@ -78,10 +78,22 @@ impl Connection {
             )),
         };
 
-        let fut = con_fut.and_then(|con| {
-            con.send(auth_cmd)
-                .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
-        });
+        let fut = con_fut
+            .then(move |res| {
+                #[cfg(feature = "log")]
+                {
+                    if let Err(err) = &res {
+                        log_facade::trace!("Connecting to {} failed: {}", addr, err)
+                    } else {
+                        log_facade::trace!("Connected to {}", addr)
+                    }
+                }
+                res
+            })
+            .and_then(|con| {
+                con.send(auth_cmd)
+                    .then(|res| cmd_future2connecting_future(res, ConnectingFailed::Auth))
+            });
 
         fut
     }
@@ -294,7 +306,6 @@ where
 }
 
 impl ConnectionConfig<Noop, DefaultTlsSetup> {
-
     /// Creates a connection to `127.0.0.1` without any form of encryption.
     ///
     /// While this is possible **it is not a good idea use this
