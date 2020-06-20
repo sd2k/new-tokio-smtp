@@ -384,6 +384,9 @@ Change Log
     syntax error or be skipped (potentially logging the bad keyword/value).
   - Added trace level logging to log the whole server conversation except mail bodies and passwords.
 
+- `v0.9.1`
+  - Trace log to which socket address a smtp connection is established (or is failed to be established).
+
 
 Contributors
 -------------
