@@ -1,30 +1,36 @@
-use std::{io as std_io};
+use std::io as std_io;
 
 use bytes::{Buf, IntoBuf};
-use futures::future::{self, Either, Future};
-use futures::stream::{self, Stream};
-use future_ext::ResultWithContextExt;
+use futures::{
+    future::{self, Either, Future},
+    stream::{self, Stream},
+};
 
-use ::{ExecFuture, Cmd, Io, EhloData};
-use ::response::codes;
-use ::error::{LogicError, MissingCapabilities};
-
+use crate::{
+    error::{LogicError, MissingCapabilities},
+    future_ext::ResultWithContextExt,
+    response::codes,
+    Cmd, EhloData, ExecFuture, Io,
+};
 
 pub struct Data<S> {
     //TODO add parameter support
-    source: S
+    source: S,
 }
 
 impl<BF> Data<stream::Once<BF, std_io::Error>>
-    where BF: Buf
+where
+    BF: Buf,
 {
-    pub fn from_buf<B: IntoBuf<Buf=BF>>(buf: B) -> Self {
+    pub fn from_buf<B: IntoBuf<Buf = BF>>(buf: B) -> Self {
         Data::new(stream::once(Ok(buf.into_buf())))
     }
 }
 
 impl<S> Data<S>
-    where S: Stream<Error=std_io::Error>, S::Item: Buf
+where
+    S: Stream<Error = std_io::Error>,
+    S::Item: Buf,
 {
     pub fn new(source: S) -> Self {
         Data { source }
@@ -32,12 +38,11 @@ impl<S> Data<S>
 }
 
 impl<S: 'static> Cmd for Data<S>
-    where S: Stream<Error=std_io::Error> + Send, S::Item: Buf
+where
+    S: Stream<Error = std_io::Error> + Send,
+    S::Item: Buf,
 {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -52,14 +57,11 @@ impl<S: 'static> Cmd for Data<S>
                     return Either::A(future::ok((io, Err(LogicError::UnexpectedCode(response)))));
                 }
 
-                let fut = io
-                    .write_dot_stashed(source)
-                    .and_then(Io::parse_response);
+                let fut = io.write_dot_stashed(source).and_then(Io::parse_response);
 
                 Either::B(fut)
             });
 
         Box::new(fut)
     }
-
 }

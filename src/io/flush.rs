@@ -1,13 +1,11 @@
 use std::io as std_io;
 
-use futures::{Poll, Future, Async};
+use futures::{Async, Future, Poll};
 use tokio::io::AsyncWrite;
 
 use super::Io;
 
-
 impl Io {
-
     /// return a futures resolving back to this instance once all output data is flushed
     pub fn flush(self) -> Flushing {
         Flushing::new(self)
@@ -43,11 +41,30 @@ impl Io {
 }
 
 pub struct Flushing {
-    inner: Option<Io>
+    inner: Option<Io>,
 }
 
 impl Flushing {
     pub(crate) fn new(inner: Io) -> Self {
+        #[cfg(feature = "log")]
+        {
+            use log_facade::*; // This is needed due to something which is probably a rustc bug.
+            if log_enabled!(Level::Trace) {
+                let out = &inner.buffer.output[..];
+                let out = String::from_utf8_lossy(out);
+                for line in out.lines() {
+                    if line.starts_with("AUTH") {
+                        let additional_chars_for_auth_subcommand =
+                            line[5..].bytes().position(|ch| ch == b' ').unwrap_or(0);
+                        let end = 5 + additional_chars_for_auth_subcommand;
+                        log_facade::trace!("C: {:?} <redacted>", &line[..end]);
+                    } else {
+                        log_facade::trace!("C: {:?}", line);
+                    }
+                }
+            }
+        }
+
         Flushing { inner: Some(inner) }
     }
 }
@@ -66,4 +83,3 @@ impl Future for Flushing {
         Ok(Async::Ready(io))
     }
 }
-

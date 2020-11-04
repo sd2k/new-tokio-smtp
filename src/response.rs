@@ -3,11 +3,10 @@
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Response {
     code: ResponseCode,
-    lines: Vec<String>
+    lines: Vec<String>,
 }
 
 impl Response {
-
     /// crate a new Response from a response code and a number of lines
     ///
     /// If lines is empty a single empty line will be pushed to the
@@ -38,39 +37,45 @@ impl Response {
     }
 }
 
-/// the response code of used by smtp server
+/// The response code of used by smtp server.
+//FIXME impl Display
+//FIXME impl Debug which shows it as byte string, i.e. human readable
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ResponseCode([u8; 3]);
 
 impl ResponseCode {
-
     /// true if the code starts with `2`
-    pub fn is_positive(&self) -> bool {
+    pub fn is_positive(self) -> bool {
         self.0[0] == b'2'
     }
 
     /// true if the code starts with `3`
-    pub fn is_intermediate(&self) -> bool {
+    pub fn is_intermediate(self) -> bool {
         self.0[0] == b'3'
     }
 
     /// true if the code starts with `4`
-    pub fn is_transient_failure(&self) -> bool {
+    pub fn is_transient_failure(self) -> bool {
         self.0[0] == b'4'
     }
 
     /// true if the code starts with `5`
-    pub fn is_permanent_failure(&self) -> bool {
+    pub fn is_permanent_failure(self) -> bool {
         self.0[0] == b'5'
     }
 
     /// true if the code doesn't start with `2` or `3`
-    pub fn is_erroneous(&self) -> bool {
+    pub fn is_erroneous(self) -> bool {
         !self.is_positive() && !self.is_intermediate()
     }
 
-    /// the actual bytes returned as response code
-    pub fn as_byte_string(&self) -> [u8; 3] {
+    /// The actual bytes returned as response code.
+    ///
+    /// This could be for example `*b'250'`. I.e. it's
+    /// in ascii characters. It's *not* a triplet of the
+    /// ascii characters converted to integer numbers!
+    //FIXME rename to as_ascii_bytes
+    pub fn as_byte_string(self) -> [u8; 3] {
         self.0
     }
 }
@@ -78,10 +83,9 @@ impl ResponseCode {
 pub mod parser {
     use super::{Response, ResponseCode};
 
-    use std::str::{self, Utf8Error};
-    use std::fmt::{self, Display};
     use std::error::Error;
-
+    use std::fmt::{self, Display};
+    use std::str::{self, Utf8Error};
 
     #[derive(Debug, Clone)]
     pub enum ParseError {
@@ -91,12 +95,12 @@ pub mod parser {
         CodeFormat {
             kind: u8,
             category: u8,
-            detail: u8
+            detail: u8,
         },
         Code {
             expected: ResponseCode,
-            got: ResponseCode
-        }
+            got: ResponseCode,
+        },
     }
 
     impl Display for ParseError {
@@ -105,14 +109,12 @@ pub mod parser {
         }
     }
 
-    impl Error for ParseError {
-        fn description(&self) -> &str { "" }
-    }
+    impl Error for ParseError {}
 
     pub struct ResponseLine {
         pub code: ResponseCode,
         pub last_line: bool,
-        pub msg: String
+        pub msg: String,
     }
 
     pub fn parse_line(line: &[u8]) -> Result<ResponseLine, ParseError> {
@@ -126,7 +128,11 @@ pub mod parser {
         let last_line = parse_separator(sep[0])?;
         let msg = parse_msg(msg)?.to_owned();
 
-        Ok(ResponseLine { code, last_line, msg })
+        Ok(ResponseLine {
+            code,
+            last_line,
+            msg,
+        })
     }
 
     /// A non-struct response code parser, as long as the code is made of digits it accepts it
@@ -150,9 +156,14 @@ pub mod parser {
         // there is hardly any reason to be super struct on the response code
         // so aslong as it's a number it's fine
         if kind.is_ascii_digit() && category.is_ascii_digit() && detail.is_ascii_digit() {
+            //FIXME kind-b'0', category-b'0', detail-b'0'
             Ok(ResponseCode([kind, category, detail]))
         } else {
-            Err(ParseError::CodeFormat { kind, category, detail })
+            Err(ParseError::CodeFormat {
+                kind,
+                category,
+                detail,
+            })
         }
     }
 
@@ -160,7 +171,7 @@ pub mod parser {
         let last_line = match sep {
             b' ' => true,
             b'-' => false,
-            _ => return Err(ParseError::CodeMsgSeparator)
+            _ => return Err(ParseError::CodeMsgSeparator),
         };
         Ok(last_line)
     }
@@ -168,7 +179,6 @@ pub mod parser {
     fn parse_msg(msg: &[u8]) -> Result<&str, ParseError> {
         str::from_utf8(msg).map_err(ParseError::Utf8)
     }
-
 
     ///
     /// Ignores the `last_line` field in the iterator, the called is required to
@@ -179,27 +189,30 @@ pub mod parser {
     /// Panics if the lines iterator does not return at last one line.
     ///
     pub fn response_from_parsed_lines<I>(lines: I) -> Result<Response, ParseError>
-        where I: IntoIterator<Item=ResponseLine>
+    where
+        I: IntoIterator<Item = ResponseLine>,
     {
         let mut iter = lines.into_iter();
         let first = iter.next().expect("called with zero lines");
         let code = first.code;
-        let mut messages = vec![ first.msg ];
+        let mut messages = vec![first.msg];
 
         for line in iter {
             if code != line.code {
                 return Err(ParseError::Code {
                     expected: code,
-                    got: line.code
-                })
+                    got: line.code,
+                });
             }
 
             messages.push(line.msg);
         }
 
-        Ok(Response { code, lines: messages })
+        Ok(Response {
+            code,
+            lines: messages,
+        })
     }
-
 }
 
 /// Predefined Codes based on RFC 5321
@@ -208,7 +221,6 @@ pub mod parser {
 /// command documentation starting with "RFC XXX;" is not quoted.
 /// In case of "RFC 5321:" the quotes come from Section 4.2.3.
 pub mod codes {
-    #[allow(non_snake_case)]
     use super::ResponseCode;
 
     /// RFC 5321: System status, or system help reply
@@ -225,7 +237,6 @@ pub mod codes {
 
     /// RFC 5321: <domain> Service closing transmission channel
     pub static CLOSING_CHANNEL: ResponseCode = ResponseCode(*b"221");
-
 
     /// RFC 5321: Requested mail action okay, completed
     pub static OK: ResponseCode = ResponseCode(*b"250");

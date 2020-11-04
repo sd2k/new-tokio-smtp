@@ -2,19 +2,17 @@ use std::io as std_io;
 
 use futures::Future;
 
-use ::common::EhloData;
-use ::error::{LogicError, MissingCapabilities};
-use ::{Cmd, ExecFuture, Io};
-
+use crate::{
+    common::EhloData,
+    error::{LogicError, MissingCapabilities},
+    Cmd, ExecFuture, Io,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Reset;
 
 impl Cmd for Reset {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-                -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -32,14 +30,10 @@ impl Cmd for Reset {
                         let logic_err = LogicError::UnexpectedCode(response);
                         Err(std_io::Error::new(std_io::ErrorKind::Other, logic_err))
                     }
-                },
-                Err(logic_err) => {
-                    Err(std_io::Error::new(std_io::ErrorKind::Other, logic_err))
                 }
+                Err(logic_err) => Err(std_io::Error::new(std_io::ErrorKind::Other, logic_err)),
             });
 
         Box::new(fut)
-
     }
 }
-

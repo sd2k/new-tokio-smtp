@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use ::data_types::{ReversePath, ForwardPath, EsmtpKeyword, EsmtpValue};
-use ::common::EhloData;
-use ::error::MissingCapabilities;
-use ::{ExecFuture, Cmd, Io};
+use crate::{
+    common::EhloData,
+    data_types::{EsmtpKeyword, EsmtpValue, ForwardPath, ReversePath},
+    error::MissingCapabilities,
+    Cmd, ExecFuture, Io,
+};
 
 /// Quit command, but as it makes the connection unusable we do
 /// not publicly provide it for usage with `Connection::send`,
@@ -13,10 +15,7 @@ use ::{ExecFuture, Cmd, Io};
 pub struct Quit;
 
 impl Cmd for Quit {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -29,10 +28,7 @@ impl Cmd for Quit {
 pub struct Noop;
 
 impl Cmd for Noop {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -40,7 +36,6 @@ impl Cmd for Noop {
         io.exec_simple_cmd(&["NOOP"])
     }
 }
-
 
 pub type Params = HashMap<EsmtpKeyword, Option<EsmtpValue>>;
 
@@ -52,21 +47,20 @@ pub fn params_with_smtputf8(mut p: Params) -> Params {
 #[derive(Debug, Clone)]
 pub struct Mail {
     pub reverse_path: ReversePath,
-    pub params: Params
+    pub params: Params,
 }
 
 impl Mail {
-
     pub fn new(reverse_path: ReversePath) -> Self {
-        Mail { reverse_path, params: Params::new() }
+        Mail {
+            reverse_path,
+            params: Params::new(),
+        }
     }
 }
 
 impl Cmd for Mail {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -75,27 +69,25 @@ impl Cmd for Mail {
     }
 }
 
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Recipient {
     //Grammar: "<Postmaster@" Domain ">" / "<Postmaster>" / forward-path
     //Note: that Postmaster is case-sensitive
     pub forward_path: ForwardPath,
-    pub params: Params
+    pub params: Params,
 }
 
 impl Recipient {
-
     pub fn new(forward_path: ForwardPath) -> Self {
-        Recipient { forward_path, params: Params::new() }
+        Recipient {
+            forward_path,
+            params: Params::new(),
+        }
     }
 }
 
 impl Cmd for Recipient {
-
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -109,7 +101,7 @@ fn handle_pathy_cmd(io: Io, cmd: &str, path: &str, params: &Params) -> ExecFutur
     if params.is_empty() {
         io.exec_simple_cmd(&[cmd, "<", path, ">"])
     } else {
-        let mut parts = vec![cmd, "<", path, ">" ];
+        let mut parts = vec![cmd, "<", path, ">"];
         for (k, v) in params.iter() {
             parts.push(" ");
             parts.push(k.as_str());
@@ -124,13 +116,11 @@ fn handle_pathy_cmd(io: Io, cmd: &str, path: &str, params: &Params) -> ExecFutur
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Verify {
-    pub query: String
+    pub query: String,
 }
 
 impl Cmd for Verify {
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -141,13 +131,11 @@ impl Cmd for Verify {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Help {
-    pub topic: Option<String>
+    pub topic: Option<String>,
 }
 
 impl Cmd for Help {
-    fn check_cmd_availability(&self, _caps: Option<&EhloData>)
-        -> Result<(), MissingCapabilities>
-    {
+    fn check_cmd_availability(&self, _caps: Option<&EhloData>) -> Result<(), MissingCapabilities> {
         Ok(())
     }
 
@@ -159,4 +147,3 @@ impl Cmd for Help {
         }
     }
 }
-

@@ -86,32 +86,31 @@
 //! # fn mock_run_with_tokio(f: impl Future<Item=(), Error=()>) { unimplemented!() }
 //! ```
 //!
-use std::{io as std_io};
+use std::io as std_io;
 use std::mem::replace;
 
 use bytes::Bytes;
-use futures::{Poll, Async, IntoFuture};
 use futures::future::{self, Either, Future};
 use futures::stream::Stream;
+use futures::{Async, IntoFuture, Poll};
 use vec1::Vec1;
 
-use ::{Cmd, Connection};
-use ::error::{
-    LogicError, MissingCapabilities,
-    GeneralError
+use crate::{
+    chain::{chain, HandleErrorInChain, OnError},
+    command::{self, params_with_smtputf8},
+    common::SetupTls,
+    connect::ConnectionConfig,
+    data_types::{ForwardPath, ReversePath},
+    error::{GeneralError, LogicError, MissingCapabilities},
+    {Cmd, Connection},
 };
-use ::common::SetupTls;
-use ::chain::{chain, OnError, HandleErrorInChain};
-use ::data_types::{ReversePath, ForwardPath};
-use ::command::{self, params_with_smtputf8};
-use ::connect::ConnectionConfig;
 
 /// Specifies if the mail requires SMTPUTF8 (or Mime8bit)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EncodingRequirement {
     None,
     Smtputf8,
-    Mime8bit
+    Mime8bit,
 }
 
 /// A simplified representation of a mail consisting of an `EncodingRequirement` and a buffer
@@ -126,17 +125,17 @@ pub enum EncodingRequirement {
 #[derive(Debug, Clone)]
 pub struct Mail {
     encoding_requirement: EncodingRequirement,
-    mail: Bytes
+    mail: Bytes,
 }
 
 impl Mail {
-
     /// create a new mail instance given a encoding requirement and a buffer
     ///
     /// The buffer contains the actual mail and is normally a string.
     pub fn new(encoding_requirement: EncodingRequirement, buffer: impl Into<Bytes>) -> Self {
         Mail {
-            encoding_requirement, mail: buffer.into()
+            encoding_requirement,
+            mail: buffer.into(),
         }
     }
 
@@ -156,7 +155,6 @@ impl Mail {
     pub fn into_raw_data(self) -> Bytes {
         self.mail
     }
-
 }
 
 /// POD representing the smtp envelops from,to's
@@ -169,10 +167,12 @@ pub struct EnvelopData {
 }
 
 impl EnvelopData {
-
     /// true if any mail address is a internationalized one
     pub fn needs_smtputf8(&self) -> bool {
-        self.from.as_ref().map(|f| f.needs_smtputf8()).unwrap_or(false)
+        self.from
+            .as_ref()
+            .map(|f| f.needs_smtputf8())
+            .unwrap_or(false)
             || self.to.iter().any(|to| to.needs_smtputf8())
     }
 }
@@ -181,16 +181,18 @@ impl EnvelopData {
 #[derive(Debug, Clone)]
 pub struct MailEnvelop {
     envelop_data: EnvelopData,
-    mail: Mail
+    mail: Mail,
 }
 
 impl MailEnvelop {
-
     //// create a new envelop
     pub fn new(from: MailAddress, to: Vec1<MailAddress>, mail: Mail) -> Self {
         MailEnvelop {
-            envelop_data: EnvelopData { from: Some(from), to },
-            mail
+            envelop_data: EnvelopData {
+                from: Some(from),
+                to,
+            },
+            mail,
         }
     }
 
@@ -198,7 +200,7 @@ impl MailEnvelop {
     pub fn without_reverse_path(to: Vec1<MailAddress>, mail: Mail) -> Self {
         MailEnvelop {
             envelop_data: EnvelopData { from: None, to },
-            mail
+            mail,
         }
     }
 
@@ -218,7 +220,6 @@ impl MailEnvelop {
     pub fn needs_smtputf8(&self) -> bool {
         self.envelop_data.needs_smtputf8() || self.mail.needs_smtputf8()
     }
-
 }
 
 impl From<(Mail, EnvelopData)> for MailEnvelop {
@@ -253,11 +254,10 @@ impl From<MailEnvelop> for (Mail, EnvelopData) {
 pub struct MailAddress {
     //FIXME[dep/good mail address crate]: use that
     raw: String,
-    needs_smtputf8: bool
+    needs_smtputf8: bool,
 }
 
 impl MailAddress {
-
     /// create a new `MailAddress` from parts
     ///
     /// this methods relies on the given values to be correct if
@@ -267,7 +267,7 @@ impl MailAddress {
     pub fn new_unchecked(raw_email: String, needs_smtputf8: bool) -> Self {
         MailAddress {
             raw: raw_email,
-            needs_smtputf8
+            needs_smtputf8,
         }
     }
 
@@ -275,13 +275,14 @@ impl MailAddress {
     ///
     /// (through it does check if it's an internationalized mail address)
     pub fn from_unchecked<I>(raw: I) -> Self
-        where I: Into<String> + AsRef<str>
+    where
+        I: Into<String> + AsRef<str>,
     {
         let has_utf8 = raw.as_ref().bytes().any(|b| b >= 0x80);
 
         MailAddress {
             raw: raw.into(),
-            needs_smtputf8: has_utf8
+            needs_smtputf8: has_utf8,
         }
     }
 
@@ -330,44 +331,53 @@ impl From<MailAddress> for ForwardPath {
 pub type MailSendResult = Result<(), (usize, LogicError)>;
 
 /// Future returned by `send_mail`
-pub type MailSendFuture = Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>;
+pub type MailSendFuture =
+    Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>;
 
 /// Sends a mail specified through `MailEnvelop` through the connection `con`.
 ///
 /// `on_error` is passed to the internally used `chain` and can allow failing
 /// some, but not all, `RCPT TO:` commands. Use `chain::OnError::StopAndReset`
 /// if you are not sure what to use here.
-pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
-    -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
-    where H: HandleErrorInChain
+pub fn send_mail<H>(
+    con: Connection,
+    envelop: MailEnvelop,
+    on_error: H,
+) -> impl Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send
+where
+    H: HandleErrorInChain,
 {
-    let use_smtputf8 =  envelop.needs_smtputf8();
+    let use_smtputf8 = envelop.needs_smtputf8();
     let (mail, EnvelopData { from, to: tos }) = envelop.into();
 
     let check_mime_8bit_support =
         !use_smtputf8 && mail.encoding_requirement() == EncodingRequirement::Mime8bit;
 
     if (use_smtputf8 && !con.has_capability("SMTPUTF8"))
-       || (check_mime_8bit_support && !con.has_capability("8BITMIME"))
+        || (check_mime_8bit_support && !con.has_capability("8BITMIME"))
     {
-        return Either::B(future::ok(
-            (con, Err((0, MissingCapabilities::new_from_unchecked("SMTPUTF8").into())))
-        ));
+        return Either::B(future::ok((
+            con,
+            Err((
+                0,
+                MissingCapabilities::new_from_unchecked("SMTPUTF8").into(),
+            )),
+        )));
     }
 
-    let reverse_path = from.map(ReversePath::from)
+    let reverse_path = from
+        .map(ReversePath::from)
         .unwrap_or_else(|| ReversePath::from_unchecked(""));
 
     let mut mail_params = Default::default();
     if use_smtputf8 {
-        mail_params  = params_with_smtputf8(mail_params);
+        mail_params = params_with_smtputf8(mail_params);
     }
-    let mut cmd_chain = vec![
-        command::Mail {
-            reverse_path,
-            params: mail_params
-        }.boxed()
-    ];
+    let mut cmd_chain = vec![command::Mail {
+        reverse_path,
+        params: mail_params,
+    }
+    .boxed()];
 
     for to in tos.into_iter() {
         cmd_chain.push(command::Recipient::new(to.into()).boxed());
@@ -378,9 +388,7 @@ pub fn send_mail<H>(con: Connection, envelop: MailEnvelop, on_error: H)
     Either::A(chain(con, cmd_chain, on_error))
 }
 
-
 impl Connection {
-
     /// Sends a mail specified through `MailEnvelop` through this connection.
     ///
     /// If any command fails sending is stopped and `RSET` is send to the server
@@ -388,9 +396,10 @@ impl Connection {
     ///
     /// see the module level documentation/README or example dir for example about
     /// how to use this.
-    pub fn send_mail(self, envelop: MailEnvelop)
-        -> impl Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send
-    {
+    pub fn send_mail(
+        self,
+        envelop: MailEnvelop,
+    ) -> impl Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send {
         send_mail(self, envelop, OnError::StopAndReset)
     }
 
@@ -411,7 +420,9 @@ impl Connection {
         mails: M,
         //FIXME[futures/v>=2.0] use Never instead of ()
     ) -> SendAllMails<M>
-        where E: From<GeneralError>, M: Iterator<Item=Result<MailEnvelop, E>>
+    where
+        E: From<GeneralError>,
+        M: Iterator<Item = Result<MailEnvelop, E>>,
     {
         SendAllMails::new(con, mails)
     }
@@ -473,20 +484,18 @@ impl Connection {
     ///
     pub fn connect_send_quit<A, E, I, T>(
         config: ConnectionConfig<A, T>,
-        mails: I
-    ) -> impl Stream<Item=(), Error=E>
-        where A: Cmd,
-              E: From<GeneralError>,
-              I: IntoIterator<Item=Result<MailEnvelop, E>>,
-              T: SetupTls
+        mails: I,
+    ) -> impl Stream<Item = (), Error = E>
+    where
+        A: Cmd,
+        E: From<GeneralError>,
+        I: IntoIterator<Item = Result<MailEnvelop, E>>,
+        T: SetupTls,
     {
-        let fut = Connection
-            ::connect(config)
+        let fut = Connection::connect(config)
             .then(|res| match res {
                 Err(err) => Err(E::from(GeneralError::from(err))),
-                Ok(con) => {
-                    Ok(SendAllMails::new(con, mails).quit_on_completion())
-                }
+                Ok(con) => Ok(SendAllMails::new(con, mails).quit_on_completion()),
             })
             .flatten_stream();
 
@@ -499,15 +508,19 @@ pub struct SendAllMails<I> {
     mails: I,
     con: Option<Connection>,
     //FIXME[rust/impl Trait in struct]
-    pending: Option<Box<Future<Item=(Connection, MailSendResult), Error=std_io::Error> + Send>>,
+    pending:
+        Option<Box<dyn Future<Item = (Connection, MailSendResult), Error = std_io::Error> + Send>>,
 }
 
 impl<I, E> SendAllMails<I>
-    where I: Iterator<Item=Result<MailEnvelop, E>>, E: From<GeneralError>
+where
+    I: Iterator<Item = Result<MailEnvelop, E>>,
+    E: From<GeneralError>,
 {
     /// create a new `SendAllMails` stream adapter
     pub fn new<V>(con: Connection, mails: V) -> Self
-        where V: IntoIterator<IntoIter=I, Item=Result<MailEnvelop, E>>
+    where
+        V: IntoIterator<IntoIter = I, Item = Result<MailEnvelop, E>>,
     {
         SendAllMails {
             mails: mails.into_iter(),
@@ -547,10 +560,10 @@ impl<I, E> SendAllMails<I>
     ///
     /// In both cases it's reasonable to simply drop the connection when
     /// dropping this stream.
-    pub fn quit_on_completion(self) -> impl Stream<Item=(), Error=E> {
+    pub fn quit_on_completion(self) -> impl Stream<Item = (), Error = E> {
         OnCompletion::new(self, |stream| {
             if let Some(con) = stream.take_connection() {
-                Either::A(con.quit().then(|_|Ok(())))
+                Either::A(con.quit().then(|_| Ok(())))
             } else {
                 Either::B(future::ok(()))
             }
@@ -568,10 +581,12 @@ impl<I, E> SendAllMails<I>
     /// closure will put the connection back into the pool it took it out
     /// from to allow connection reuse.
     //FIXME[futures/v>=0.2] use Never for IntoFuture futures Error
-    pub fn on_completion<F, ITF>(self, func: F) -> impl Stream<Item=(), Error=E>
-        where F: FnOnce(Option<Connection>) -> ITF, ITF: IntoFuture<Item=(), Error=()>
+    pub fn on_completion<F, ITF>(self, func: F) -> impl Stream<Item = (), Error = E>
+    where
+        F: FnOnce(Option<Connection>) -> ITF,
+        ITF: IntoFuture<Item = (), Error = ()>,
     {
-        OnCompletion::new(self,|stream| {
+        OnCompletion::new(self, |stream| {
             let opt_con = stream.take_connection();
             func(opt_con)
         })
@@ -579,10 +594,12 @@ impl<I, E> SendAllMails<I>
 }
 
 impl<I, E> Stream for SendAllMails<I>
-    where I: Iterator<Item=Result<MailEnvelop, E>>, E: From<GeneralError>
+where
+    I: Iterator<Item = Result<MailEnvelop, E>>,
+    E: From<GeneralError>,
 {
-    type Item=();
-    type Error=E;
+    type Item = ();
+    type Error = E;
 
     //FIXME[futures/async streams]
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -592,17 +609,15 @@ impl<I, E> Stream for SendAllMails<I>
                     Ok(Async::NotReady) => {
                         self.pending = Some(pending);
                         Ok(Async::NotReady)
-                    },
+                    }
                     Ok(Async::Ready((con, result))) => {
                         self.con = Some(con);
                         match result {
-                            Ok(res) => Ok(Async::Ready(Some(res))),
-                            Err((_idx, err)) => Err(E::from(GeneralError::from(err)))
+                            Ok(()) => Ok(Async::Ready(Some(()))),
+                            Err((_idx, err)) => Err(E::from(GeneralError::from(err))),
                         }
-                    },
-                    Err(io_error) => {
-                        Err(E::from(GeneralError::from(io_error)))
                     }
+                    Err(io_error) => Err(E::from(GeneralError::from(io_error))),
                 };
             }
 
@@ -615,13 +630,12 @@ impl<I, E> Stream for SendAllMails<I>
                     } else {
                         Err(E::from(GeneralError::Io(std_io::Error::new(
                             std_io::ErrorKind::NotConnected,
-                            "previous error killed connection"
+                            "previous error killed connection",
                         ))))
                     }
-                },
-                Some(Err(err)) => Err(err)
+                }
+                Some(Err(err)) => Err(err),
             };
-
         }
     }
 }
@@ -634,13 +648,13 @@ impl<I, E> Stream for SendAllMails<I>
 /// time when it completes again
 pub struct OnCompletion<S, F, UF> {
     stream: S,
-    state: CompletionState<F, UF>
+    state: CompletionState<F, UF>,
 }
 
 enum CompletionState<F, U> {
     Done,
     Ready(F),
-    Pending(U)
+    Pending(U),
 }
 
 impl<F, U> CompletionState<F, U> {
@@ -654,14 +668,17 @@ impl<F, U> CompletionState<F, U> {
         match me {
             Done => None,
             Ready(func) => Some(func),
-            Pending(_) => panic!("[BUG] take func in pending state")
+            Pending(_) => panic!("[BUG] take func in pending state"),
         }
     }
 }
 
 impl<S, F, U> OnCompletion<S, F, U::Future>
-    //FIXME[futures/v>=0.2] Error=Never
-    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture<Item=(), Error=()>
+//FIXME[futures/v>=0.2] Error=Never
+where
+    S: Stream,
+    F: FnOnce(&mut S) -> U,
+    U: IntoFuture<Item = (), Error = ()>,
 {
     /// creates a new adapter calling func the first time the stream completes.
     ///
@@ -678,35 +695,37 @@ impl<S, F, U> OnCompletion<S, F, U::Future>
     ///
     pub fn new(stream: S, func: F) -> Self {
         OnCompletion {
-            stream, state: CompletionState::Ready(func)
-            //, _u: ::std::marker::PhantomData
+            stream,
+            state: CompletionState::Ready(func), //, _u: ::std::marker::PhantomData
         }
     }
 }
 
 impl<S, F, U> Stream for OnCompletion<S, F, U::Future>
-    //FIXME[futures/v>=0.2] Error=Never
-    where S: Stream, F: FnOnce(&mut S) -> U, U: IntoFuture
+//FIXME[futures/v>=0.2] Error=Never
+where
+    S: Stream,
+    F: FnOnce(&mut S) -> U,
+    U: IntoFuture,
 {
     type Item = S::Item;
     type Error = S::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            let is_done =
-                if let &mut CompletionState::Pending(ref mut fut) = &mut self.state {
-                    if let Ok(Async::NotReady) = fut.poll() {
-                        return Ok(Async::NotReady)
-                    } else {
-                        true
-                    }
+            let is_done = if let CompletionState::Pending(fut) = &mut self.state {
+                if let Ok(Async::NotReady) = fut.poll() {
+                    return Ok(Async::NotReady);
                 } else {
-                    false
-                };
+                    true
+                }
+            } else {
+                false
+            };
 
             if is_done {
                 self.state = CompletionState::Done;
-                return Ok(Async::Ready(None))
+                return Ok(Async::Ready(None));
             }
 
             let next = try_ready!(self.stream.poll());
@@ -716,7 +735,7 @@ impl<S, F, U> Stream for OnCompletion<S, F, U::Future>
             } else if let Some(func) = self.state.take_func() {
                 let fut = func(&mut self.stream).into_future();
                 self.state = CompletionState::Pending(fut);
-                continue
+                continue;
             } else {
                 // polled after completion, through maybe S was fused so
                 // just return None
@@ -728,9 +747,9 @@ impl<S, F, U> Stream for OnCompletion<S, F, U::Future>
 
 #[cfg(test)]
 mod test {
-    use ::{Connection, ConnectionConfig, command};
-    use ::error::GeneralError;
-    use ::send_mail::MailEnvelop;
+    use crate::{
+        command, error::GeneralError, send_mail::MailEnvelop, Connection, ConnectionConfig,
+    };
 
     fn assert_send(_: &impl Send) {}
 
@@ -742,5 +761,4 @@ mod test {
         let fut = Connection::connect_send_quit(config, mails);
         assert_send(&fut);
     }
-
 }

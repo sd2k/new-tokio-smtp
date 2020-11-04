@@ -1,6 +1,21 @@
 new-tokio-smtp [![docs](https://docs.rs/new-tokio-smtp/badge.svg)](https://docs.rs/new-tokio-smtp) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 =====================
 
+Maintenance Status
+------------------
+
+This crate is currently passively maintained, this means:
+
+- I will still respond to bugs, and fix them (if this doesn't involve any *major* rewrites).
+- I will still evaluate and merge PR's. (As long as I don't get flooded and they don't rewrite
+  the whole crate or similar ;-)
+
+Also the maintenance status might go back to actively maintained in the future.
+
+
+Description
+-------------
+
 The new-tokio-smtp crate provides an extendible SMTP (Simple Mail Transfer Protocol)
 implementation using tokio.
 
@@ -155,6 +170,64 @@ fn read_password() -> String {
 }
 ```
 
+Testing
+---------
+
+`cargo test --features "mock-impl"`
+
+Just running `cargo test` won't work for now,
+this might be fixed in the future with cargo
+supporting "for testing only default features"
+or similar.
+
+Debugging SMTP
+---------------
+
+If the log (default) feature is enabled and
+the log level is set to trace then the whole
+client/server interaction is logged.
+
+Any line the server sends is logged after
+receiving it and before parsing it and
+any line the client sends is logged before
+sending it (before flushing).
+
+The exception is that send mail bodies are
+not logged. Furthermore for any line the client
+send starting with "AUTH" everything except the
+next word will be redacted to prevent logging
+passwords, access tokens and similar. For
+example in case of auth plain login only
+`"AUTH PLAIN <redacted>"` will be logged.
+
+This still means that when using trace logging
+following thinks will still be logged:
+
+- client id
+- server id
+- server greeting message (can contain the
+  client ip or DNS name depending on the
+  server you connect to).
+- sending mail address
+- all receiving mail addresses
+
+Given that trace logging should only be enabled
+for debugging purpose this isn't a problem even
+with GDPR. If you still do set it up so that it's not enabled for this crate. E.g. with env_logger it would be something like `RUST_LOG="new_tokio_smtp=warn,trace" to enabled trace logging for all places but smtp. But you can
+easily run into GDPR incompatibility as this likely
+would log e.g. IP addresses of connecting clients
+and similar.
+
+Note that trace logging does imply a performance
+overhead above just writing to the log as the
+trace logging is done on a low level where not
+string but bytes are handled and as such they
+have to be converted back to an string additional
+each command line (not mail msg) the client send
+needs to be checked to see if it's starts with AUTH
+and needs to be redacted, etc.
+
+
 Concept
 --------
 
@@ -296,6 +369,23 @@ Change Log
 
 - `v0.8.1`
   - `SelectCmd` and `EitherCmd` where added
+
+- `v0.8.2`
+  - Fix bug where the wrong parsing error was emitted for
+    `EsmtpValue`
+  - Now uses `rustfmt`.
+  - Warn but not fail on un-parsable ehlo capability response lines
+
+- `v0.9.0`
+  - Some small API cleanup.
+  - Made `log` and (default) feature. So if no log implementor is set up the
+    crate doesn't need to be compiled in.
+  - Made it configurable if bad EHLO capability response lines should trigger an
+    syntax error or be skipped (potentially logging the bad keyword/value).
+  - Added trace level logging to log the whole server conversation except mail bodies and passwords.
+
+- `v0.9.1`
+  - Trace log to which socket address a smtp connection is established (or is failed to be established).
 
 
 Contributors

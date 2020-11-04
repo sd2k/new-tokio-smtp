@@ -1,5 +1,5 @@
 //! provieds an extension trait for futures of the form `Future<(Ctx, Result<Item, Err>), Err2>`
-use futures::{Future, IntoFuture, Poll, Async};
+use futures::{Async, Future, IntoFuture, Poll};
 
 /// A helper trait implemented on Futures
 ///
@@ -7,8 +7,7 @@ use futures::{Future, IntoFuture, Poll, Async};
 /// item of the form `(Ctx, Result<Item, Err>)` and adds
 /// chaining methods which are based on the result inside
 /// the item instead of the result the future resolves to
-pub trait ResultWithContextExt<Ctx, I, E>: Future<Item=(Ctx, Result<I, E>)> {
-
+pub trait ResultWithContextExt<Ctx, I, E>: Future<Item = (Ctx, Result<I, E>)> {
     /// use this to chain based on the Ctx and _inner_ item in a future
     /// like `Future<(Ctx, Result<Item, Err>), Err2>`
     ///
@@ -21,9 +20,10 @@ pub trait ResultWithContextExt<Ctx, I, E>: Future<Item=(Ctx, Result<I, E>)> {
     ///     note that the result of f has to be convertible into an
     ///     future of the impl `Future<(Ctx, Result<Item2, Err>), Err2>`
     fn ctx_and_then<FN, B, I2>(self, f: FN) -> CtxAndThen<Self, B, FN>
-        where FN: FnOnce(Ctx, I) -> B,
-              B: IntoFuture<Item=(Ctx, Result<I2, E>), Error=Self::Error>,
-              Self: Sized;
+    where
+        FN: FnOnce(Ctx, I) -> B,
+        B: IntoFuture<Item = (Ctx, Result<I2, E>), Error = Self::Error>,
+        Self: Sized;
 
     /// use this to chain based on the Ctx and _inner_ error in a future
     /// like `Future<(Ctx, Result<Item, Err>), Err2>`
@@ -37,36 +37,39 @@ pub trait ResultWithContextExt<Ctx, I, E>: Future<Item=(Ctx, Result<I, E>)> {
     ///     note that the result of f has to be convertible into an
     ///     future of the impl `Future<(Ctx, Result<Item, Err3>), Err2>`
     fn ctx_or_else<FN, B, E2>(self, f: FN) -> CtxOrElse<Self, B, FN>
-        where FN: FnOnce(Ctx, E) -> B,
-              B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=Self::Error>,
-              Self: Sized;
+    where
+        FN: FnOnce(Ctx, E) -> B,
+        B: IntoFuture<Item = (Ctx, Result<I, E2>), Error = Self::Error>,
+        Self: Sized;
 }
 
 impl<Ctx, I, E, FUT> ResultWithContextExt<Ctx, I, E> for FUT
-    where FUT: Future<Item=(Ctx, Result<I, E>)>
+where
+    FUT: Future<Item = (Ctx, Result<I, E>)>,
 {
     fn ctx_and_then<FN, B, I2>(self, f: FN) -> CtxAndThen<Self, B, FN>
-        where FN: FnOnce(Ctx, I) -> B,
-              B: IntoFuture<Item=(Ctx, Result<I2, E>), Error=Self::Error>,
-              Self: Sized
+    where
+        FN: FnOnce(Ctx, I) -> B,
+        B: IntoFuture<Item = (Ctx, Result<I2, E>), Error = Self::Error>,
+        Self: Sized,
     {
         CtxAndThen {
             state: State::Parent(self),
-            map_fn: Some(f)
+            map_fn: Some(f),
         }
     }
 
     fn ctx_or_else<FN, B, E2>(self, f: FN) -> CtxOrElse<Self, B, FN>
-        where FN: FnOnce(Ctx, E) -> B,
-              B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=Self::Error>,
-              Self: Sized
+    where
+        FN: FnOnce(Ctx, E) -> B,
+        B: IntoFuture<Item = (Ctx, Result<I, E2>), Error = Self::Error>,
+        Self: Sized,
     {
         CtxOrElse {
             state: State::Parent(self),
-            map_fn: Some(f)
+            map_fn: Some(f),
         }
     }
-
 }
 
 enum State<P, IM> {
@@ -76,34 +79,33 @@ enum State<P, IM> {
 
 /// future adapter see `ResultWithContextExt::ctx_and_then`
 pub struct CtxAndThen<P, B, FN>
-    where B: IntoFuture,
-
+where
+    B: IntoFuture,
 {
     state: State<P, B::Future>,
-    map_fn: Option<FN>
+    map_fn: Option<FN>,
 }
 
 impl<P, B, FN, Ctx, I, I2, E> Future for CtxAndThen<P, B, FN>
-    where P: Future<Item=(Ctx, Result<I, E>)>,
-          FN: FnOnce(Ctx, I) -> B,
-          B: IntoFuture<Item=(Ctx, Result<I2, E>), Error=P::Error>,
+where
+    P: Future<Item = (Ctx, Result<I, E>)>,
+    FN: FnOnce(Ctx, I) -> B,
+    B: IntoFuture<Item = (Ctx, Result<I2, E>), Error = P::Error>,
 {
     type Item = (Ctx, Result<I2, E>);
     type Error = P::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let (ctx, result) = match self.state {
-            State::Parent(ref mut p) => {
-                try_ready!(p.poll())
-            },
-            State::Intermediate(ref mut im) => {
+        let (ctx, result) = match &mut self.state {
+            State::Parent(p) => try_ready!(p.poll()),
+            State::Intermediate(im) => {
                 return im.poll();
-            },
+            }
         };
 
         let item = match result {
             Err(err) => return Ok(Async::Ready((ctx, Err(err)))),
-            Ok(item) => item
+            Ok(item) => item,
         };
 
         let map_fn = self.map_fn.take().expect("polled after completion/panic");
@@ -120,34 +122,33 @@ impl<P, B, FN, Ctx, I, I2, E> Future for CtxAndThen<P, B, FN>
 // (macro or something like ctx_on_inner(get_from_result_fn, map_stuf_you_got_fn))
 /// future adapter see `ResultWithContextExt::ctx_or_else`
 pub struct CtxOrElse<P, B, FN>
-    where B: IntoFuture,
-
+where
+    B: IntoFuture,
 {
     state: State<P, B::Future>,
-    map_fn: Option<FN>
+    map_fn: Option<FN>,
 }
 
 impl<P, B, FN, Ctx, I, E, E2> Future for CtxOrElse<P, B, FN>
-    where P: Future<Item=(Ctx, Result<I, E>)>,
-          FN: FnOnce(Ctx, E) -> B,
-          B: IntoFuture<Item=(Ctx, Result<I, E2>), Error=P::Error>,
+where
+    P: Future<Item = (Ctx, Result<I, E>)>,
+    FN: FnOnce(Ctx, E) -> B,
+    B: IntoFuture<Item = (Ctx, Result<I, E2>), Error = P::Error>,
 {
     type Item = (Ctx, Result<I, E2>);
     type Error = P::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let (ctx, result) = match self.state {
-            State::Parent(ref mut p) => {
-                try_ready!(p.poll())
-            },
-            State::Intermediate(ref mut im) => {
+        let (ctx, result) = match &mut self.state {
+            State::Parent(p) => try_ready!(p.poll()),
+            State::Intermediate(im) => {
                 return im.poll();
-            },
+            }
         };
 
         let err = match result {
             Ok(item) => return Ok(Async::Ready((ctx, Ok(item)))),
-            Err(err) => err
+            Err(err) => err,
         };
 
         let map_fn = self.map_fn.take().expect("polled after completion/panic");
@@ -160,25 +161,23 @@ impl<P, B, FN, Ctx, I, E, E2> Future for CtxOrElse<P, B, FN>
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
     mod ctx_and_then {
-        use std::io::{Error, ErrorKind};
-        use futures::future::{self, Future};
         use super::super::*;
+        use futures::future::{self, Future};
+        use std::io::{Error, ErrorKind};
 
         #[test]
         fn map_outer_err() {
-            let fut = future::err::<(String, Result<u8, String>), Error>(
-                Error::new(ErrorKind::Other, "test")
-            );
+            let fut = future::err::<(String, Result<u8, String>), Error>(Error::new(
+                ErrorKind::Other,
+                "test",
+            ));
 
             let res = fut
-                .ctx_and_then(|_ctx, _item| -> Result<(_, Result<String, _>), _> {
-                    unreachable!()
-                })
+                .ctx_and_then(|_ctx, _item| -> Result<(_, Result<String, _>), _> { unreachable!() })
                 .wait();
 
             assert!(res.is_err());
@@ -202,8 +201,10 @@ mod test {
 
         #[test]
         fn map_inner_err() {
-            let fut = future::ok::<(String, Result<u8, String>), Error>(
-                ("14".to_owned(), Err("err".to_owned())));
+            let fut = future::ok::<(String, Result<u8, String>), Error>((
+                "14".to_owned(),
+                Err("err".to_owned()),
+            ));
 
             let res = fut
                 .ctx_and_then(|ctx, item| {
@@ -214,7 +215,7 @@ mod test {
                 .wait()
                 .unwrap();
 
-            assert_eq!(res,  ("14".to_owned(), Err("err".to_owned())));
+            assert_eq!(res, ("14".to_owned(), Err("err".to_owned())));
         }
 
         #[test]
@@ -223,7 +224,9 @@ mod test {
 
             let res = fut
                 .ctx_and_then(|ctx, item| {
-                    if /*false*/ item > 128 {
+                    if
+                    /*false*/
+                    item > 128 {
                         Ok((ctx, Ok(0u32)))
                     } else {
                         Ok((ctx, Err("failed".to_owned())))

@@ -1,26 +1,25 @@
 //! provides a `MockStream` implementations
+use std::cmp::min;
 use std::io::{self as std_io, Read, Write};
+use std::mem;
 use std::thread;
 use std::time::Duration;
-use std::mem;
-use std::cmp::min;
 
 use rand::{random, thread_rng, Rng};
 
-use bytes::{BytesMut, BufMut};
-use futures::{future, Future, Poll, Async, Stream};
-use futures::task::{self, Task};
+use bytes::{BufMut, BytesMut};
 use futures::sync::mpsc;
+use futures::task::{self, Task};
+use futures::{future, Async, Future, Poll, Stream};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-
-use ::io::MockStream;
+use crate::io::MockStream;
 
 /// Represents if the action is taken by `Client` or `Server`
 #[derive(Debug)]
 pub enum Actor {
     Server,
-    Client
+    Client,
 }
 
 /// the data send by Client/Server
@@ -31,19 +30,18 @@ pub enum ActionData {
     /// The trailing "\r\n" will be added implicitly
     Lines(Vec<&'static str>),
     /// A blob of bytes
-    Blob(Vec<u8>)
+    Blob(Vec<u8>),
 }
 
 impl ActionData {
-
     /// returns the len of the data
     ///
     /// In case of `ActionData::Lines` the implied `"\r\n"` line
     /// endings are added into the length (i.e. len +2 for each line).
     pub fn len(&self) -> usize {
-        match *self {
-            ActionData::Blob(ref blob) => blob.len(),
-            ActionData::Lines(ref lines) => {
+        match self {
+            ActionData::Blob(blob) => blob.len(),
+            ActionData::Lines(lines) => {
                 //MAGIC_NUM: +2 = "\r\n".len()
                 lines.iter().map(|ln| ln.len() + 2).sum()
             }
@@ -51,17 +49,22 @@ impl ActionData {
     }
 
     pub fn assert_same_start(&self, other: &[u8]) {
-
-        match *self {
-            ActionData::Blob(ref blob) => {
+        match self {
+            ActionData::Blob(blob) => {
                 let use_len = min(blob.len(), other.len());
                 let other = &other[..use_len];
                 let blob = &blob[..use_len];
                 //TODO better error message (assert_eq is a BAD idea here as
                 // it will flood the output)
-                assert!(blob == other, "unexpected data");
-            },
-            ActionData::Lines(ref lines) => {
+                if blob != other {
+                    let blob = String::from_utf8_lossy(blob);
+                    let other = String::from_utf8_lossy(other);
+                    dbg!(blob);
+                    dbg!(other);
+                    panic!("unexpected data");
+                }
+            }
+            ActionData::Lines(lines) => {
                 let mut rem = other;
                 for line in lines.iter() {
                     let use_len = min(line.len(), rem.len());
@@ -88,18 +91,25 @@ fn check_crlf_start(tail: &[u8]) -> &[u8] {
     let mut tail = tail;
     let length = tail.len();
     if length >= 1 {
-        assert!(tail[0] == b'\r', "unexpected data, expected '\\r' got {:?} in {}",
-            tail[0] as char, String::from_utf8_lossy(tail));
+        assert!(
+            tail[0] == b'\r',
+            "unexpected data, expected '\\r' got {:?} in {}",
+            tail[0] as char,
+            String::from_utf8_lossy(tail)
+        );
         tail = &tail[1..];
     }
     if length >= 2 {
-        assert!(tail[0] == b'\n', "unexpected data, expected '\\n' got {:?}in {}",
-            tail[0] as char, String::from_utf8_lossy(tail));
+        assert!(
+            tail[0] == b'\n',
+            "unexpected data, expected '\\n' got {:?}in {}",
+            tail[0] as char,
+            String::from_utf8_lossy(tail)
+        );
         tail = &tail[1..];
     }
 
     tail
-
 }
 
 type Waker = mpsc::UnboundedSender<Task>;
@@ -108,28 +118,27 @@ type Waker = mpsc::UnboundedSender<Task>;
 enum State {
     ServerIsWorking {
         waker: Waker,
-        to_be_read: BytesMut
+        to_be_read: BytesMut,
     },
     ClientIsWorking {
         expected: ActionData,
         waker: Waker,
-        input: BytesMut
+        input: BytesMut,
     },
     NeedNewAction {
         waker: Waker,
-        buffer: BytesMut
+        buffer: BytesMut,
     },
-    ShutdownOrPoison
+    ShutdownOrPoison,
 }
 
 impl State {
-
     fn waker(&self) -> &Waker {
-        match *self {
-            State::ServerIsWorking { ref waker, ..} => waker,
-            State::ClientIsWorking { ref waker, ..} => waker,
-            State::NeedNewAction { ref waker, ..} => waker,
-            _ => panic!("trying to schedule wake up on shutdown stream")
+        match self {
+            State::ServerIsWorking { waker, .. } => waker,
+            State::ClientIsWorking { waker, .. } => waker,
+            State::NeedNewAction { waker, .. } => waker,
+            _ => panic!("trying to schedule wake up on shutdown stream"),
         }
     }
 }
@@ -139,7 +148,7 @@ pub struct MockSocket {
     conversation: Vec<(Actor, ActionData)>,
     fake_secure: bool,
     state: State,
-    check_shutdown: bool
+    check_shutdown: bool,
 }
 
 /// MockSocket going through a pre-coded interlocked client-server conversation
@@ -157,7 +166,6 @@ pub struct MockSocket {
 /// - `NeedNewAction`, the previous action was completed and a new one is needed
 ///
 impl MockSocket {
-
     pub fn new(conversation: Vec<(Actor, ActionData)>) -> Self {
         Self::new_with_params(conversation, true)
     }
@@ -182,7 +190,7 @@ impl MockSocket {
             fake_secure: false,
             state: State::NeedNewAction {
                 buffer: BytesMut::new(),
-                waker: delayed_waker()
+                waker: delayed_waker(),
             },
         }
     }
@@ -194,9 +202,7 @@ impl MockSocket {
     }
 
     fn schedule_delayed_wake(&mut self) {
-        self.state.waker()
-            .unbounded_send(task::current())
-            .unwrap()
+        self.state.waker().unbounded_send(task::current()).unwrap()
     }
 
     /// has a 1/16 chance to return `NotReady` and schedule the current `Task` to be notified later
@@ -207,7 +213,7 @@ impl MockSocket {
     /// would requires using something similar to `quick check`
     pub fn maybe_inject_not_ready(&mut self) -> Poll<(), std_io::Error> {
         // 1/16 chance to be not ready
-        if random::<u8>() >= 240 {
+        if random::<u8>() >= 124 {
             self.schedule_delayed_wake();
             Ok(Async::NotReady)
         } else {
@@ -230,7 +236,9 @@ impl MockSocket {
     ///   buffer is not empty
     ///
     fn prepare_next(&mut self, waker: Waker, buffer: BytesMut) -> State {
-        let (actor, data) = self.conversation.pop()
+        let (actor, data) = self
+            .conversation
+            .pop()
             .expect("prepare next on empty conversation");
 
         let mut buffer = buffer;
@@ -238,8 +246,11 @@ impl MockSocket {
         match actor {
             Actor::Server => {
                 // 1. data into() buffer
-                assert!(buffer.is_empty(), "buffer had remaining input: {:?}",
-                   String::from_utf8_lossy(buffer.as_ref()));
+                assert!(
+                    buffer.is_empty(),
+                    "buffer had remaining input: {:?}",
+                    String::from_utf8_lossy(buffer.as_ref())
+                );
                 buffer.reserve(data.len());
                 match data {
                     ActionData::Lines(lines) => {
@@ -247,32 +258,29 @@ impl MockSocket {
                             buffer.put(line);
                             buffer.put("\r\n");
                         }
-                    },
+                    }
                     ActionData::Blob(blob) => {
                         buffer.put(blob);
                     }
                 }
                 State::ServerIsWorking {
                     waker,
-                    to_be_read: buffer
+                    to_be_read: buffer,
                 }
-            },
+            }
             Actor::Client => {
                 // 1. clear buffer / reserve space in buffer
                 State::ClientIsWorking {
                     expected: data,
                     waker,
-                    input: buffer
+                    input: buffer,
                 }
             }
         }
     }
-
-
 }
 
 impl Drop for MockSocket {
-
     /// `drop` impl
     ///
     /// # Implementation Detail
@@ -283,25 +291,30 @@ impl Drop for MockSocket {
     fn drop(&mut self) {
         if !thread::panicking() {
             if self.check_shutdown {
-                if let State::ShutdownOrPoison = self.state {}
-                else { panic!("connection was not shutdown"); }
+                if let State::ShutdownOrPoison = self.state {
+                } else {
+                    panic!("connection was not shutdown");
+                }
             }
 
-            assert!(self.conversation.is_empty(), "premature cancellation of conversation");
+            assert!(
+                self.conversation.is_empty(),
+                "premature cancellation of conversation"
+            );
         }
     }
 }
 
-impl From<MockSocket> for ::io::Socket {
+impl From<MockSocket> for crate::io::Socket {
     fn from(s: MockSocket) -> Self {
-        ::io::Socket::Mock(Box::new(s))
+        crate::io::Socket::Mock(Box::new(s))
     }
 }
 
-impl From<MockSocket> for ::io::Io {
+impl From<MockSocket> for crate::io::Io {
     fn from(s: MockSocket) -> Self {
-        let socket: ::io::Socket = s.into();
-        ::io::Io::from((socket, ::io::Buffers::new()))
+        let socket: crate::io::Socket = s.into();
+        crate::io::Io::from((socket, crate::io::Buffers::new()))
     }
 }
 
@@ -316,29 +329,30 @@ impl MockStream for MockSocket {
 }
 
 macro_rules! try_ready_or_would_block {
-    ($expr:expr) => ({
+    ($expr:expr) => {{
         let res = $expr;
         match res {
             Ok(Async::Ready(t)) => t,
             Ok(Async::NotReady) => {
-                return Err(std_io::Error::new(std_io::ErrorKind::WouldBlock, "Async::NotReady"));
-            },
+                return Err(std_io::Error::new(
+                    std_io::ErrorKind::WouldBlock,
+                    "Async::NotReady",
+                ));
+            }
             Err(err) => {
                 return Err(err);
             }
         }
-    });
+    }};
 }
 
 impl Read for MockSocket {
-
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std_io::Error> {
         Ok(try_ready_or_would_block!(self.poll_read(buf)))
     }
 }
 
 impl Write for MockSocket {
-
     fn write(&mut self, buf: &[u8]) -> Result<usize, std_io::Error> {
         Ok(try_ready_or_would_block!(self.poll_write(buf)))
     }
@@ -347,7 +361,6 @@ impl Write for MockSocket {
         Ok(try_ready_or_would_block!(self.poll_flush()))
     }
 }
-
 
 // before read/write:
 //   read/write --> state == NeedNewAction --> prepare next action
@@ -388,7 +401,6 @@ impl Write for MockSocket {
 //   send Task to DelayedWakerThread
 
 impl AsyncRead for MockSocket {
-
     /// `poll_read` impl
     ///
     /// # Implementation Details
@@ -404,12 +416,10 @@ impl AsyncRead for MockSocket {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
         match state {
-            State::ShutdownOrPoison => {
-                panic!("tried reading from shutdown/poisoned stream")
-            },
+            State::ShutdownOrPoison => panic!("tried reading from shutdown/poisoned stream"),
             State::ClientIsWorking { .. } => {
                 panic!("tried to read from socket while it should only write to it")
-            },
+            }
             State::NeedNewAction { waker, buffer } => {
                 if self.conversation.is_empty() {
                     self.state = State::NeedNewAction { waker, buffer };
@@ -419,7 +429,10 @@ impl AsyncRead for MockSocket {
                 self.schedule_delayed_wake();
                 Ok(Async::NotReady)
             }
-            State::ServerIsWorking { waker, mut to_be_read } => {
+            State::ServerIsWorking {
+                waker,
+                mut to_be_read,
+            } => {
                 let rem = to_be_read.len();
                 let can_write = buf.len();
                 let should_write = random_amount(min(rem, can_write));
@@ -428,25 +441,27 @@ impl AsyncRead for MockSocket {
                 to_be_read.advance(should_write);
 
                 if to_be_read.is_empty() {
-                    self.state = State::NeedNewAction { waker, buffer: to_be_read }
+                    self.state = State::NeedNewAction {
+                        waker,
+                        buffer: to_be_read,
+                    }
                 } else {
                     self.state = State::ServerIsWorking { waker, to_be_read }
                 }
                 Ok(Async::Ready(should_write))
-            },
+            }
         }
     }
 }
 
 impl AsyncWrite for MockSocket {
-
     /// `poll_write` impl
     ///
     /// # Implementation Details
     ///
     /// - Can always return with `NotReady` before doing anything.
     /// - panics if the state is `ServerIsWorking` or `ShutdownOrPoison`
-    /// - on `NeedNewAction` it advances the state to the next extion and
+    /// - on `NeedNewAction` it advances the state to the next action and
     ///   returns `NotReady` panicing if there is no new action
     /// - writes a random amount of passed in bytes (at last 1) to the
     ///   input buffer then returns `Ready` with the written byte count
@@ -454,31 +469,35 @@ impl AsyncWrite for MockSocket {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
         match state {
-            State::ShutdownOrPoison => {
-                panic!("tried reading from shutdown/poisoned stream")
-            },
+            State::ShutdownOrPoison => panic!("tried reading from shutdown/poisoned stream"),
             State::ServerIsWorking { .. } => {
                 panic!("tried to write to socket while it should only read from it")
-            },
+            }
             State::NeedNewAction { waker, buffer } => {
                 self.state = self.prepare_next(waker, buffer);
                 self.schedule_delayed_wake();
                 Ok(Async::NotReady)
             }
-            State::ClientIsWorking { expected, waker, mut input } => {
+            State::ClientIsWorking {
+                expected,
+                waker,
+                mut input,
+            } => {
                 let amount = random_amount(buf.len());
                 if input.remaining_mut() < amount {
                     input.reserve(amount)
                 }
-                let actual_write = buf.split_at(amount).0;
-                input.put(actual_write);
+                input.put(&buf[..amount]);
 
-                self.state = State::ClientIsWorking { expected, waker, input };
+                self.state = State::ClientIsWorking {
+                    expected,
+                    waker,
+                    input,
+                };
                 Ok(Async::Ready(amount))
             }
         }
     }
-
 
     /// `poll_flush` impl
     ///
@@ -504,12 +523,10 @@ impl AsyncWrite for MockSocket {
         try_ready!(self.maybe_inject_not_ready());
         let state = mem::replace(&mut self.state, State::ShutdownOrPoison);
         match state {
-            State::ShutdownOrPoison => {
-                panic!("tried reading from shutdown/poisoned stream")
-            },
+            State::ShutdownOrPoison => panic!("tried reading from shutdown/poisoned stream"),
             State::ServerIsWorking { .. } => {
                 panic!("tried to write to socket while it should only read from it")
-            },
+            }
             State::NeedNewAction { waker, buffer } => {
                 //poll flush on NeedNewAction + empty conversation should _not_ panic
                 if self.conversation.is_empty() {
@@ -521,17 +538,28 @@ impl AsyncWrite for MockSocket {
                     Ok(Async::NotReady)
                 }
             }
-            State::ClientIsWorking { expected, waker, mut input } => {
+            State::ClientIsWorking {
+                expected,
+                waker,
+                mut input,
+            } => {
                 // first: if !expected.starts_with(input) => assert panic
                 expected.assert_same_start(&input);
                 // then: if input >= expected { input.advance(expected.len()); state advance too
                 let expected_len = expected.len();
                 if input.len() >= expected_len {
                     input.advance(expected_len);
-                    self.state = State::NeedNewAction { waker, buffer: input };
+                    self.state = State::NeedNewAction {
+                        waker,
+                        buffer: input,
+                    };
                     Ok(Async::Ready(()))
                 } else {
-                    self.state = State::ClientIsWorking { expected, waker, input };
+                    self.state = State::ClientIsWorking {
+                        expected,
+                        waker,
+                        input,
+                    };
                     Ok(Async::Ready(()))
                 }
             }
@@ -555,25 +583,26 @@ impl AsyncWrite for MockSocket {
         try_ready!(self.poll_flush());
         match &self.state {
             &State::ShutdownOrPoison => (),
-            &State::NeedNewAction {..} => (),
-            _ => panic!("unexpected state when shutting down")
+            &State::NeedNewAction { .. } => (),
+            _ => panic!("unexpected state when shutting down"),
         }
         self.state = State::ShutdownOrPoison;
         Ok(Async::Ready(()))
     }
 }
 
-
 /// returns a random number in `[1; max_inclusive]`, where` max_inclusive` is the most likely value
 ///
 /// Note: `random_amount(0)` always returns 0, any other value returns a number
-/// between 1 and the value (inclusive).
+/// between 1 and the value (inclusive). With some slight bias to higher values.
 fn random_amount(max_inclusive: usize) -> usize {
-    // max is inclusive but gen_range would make it exclusive
-    let max_write = max_inclusive + 1;
     // make it more "likely" to write more stuff
     // (this is statistically horrible hack, but works fine here)
-    min(max_inclusive, thread_rng().gen_range(1, max_write + 16))
+    // (the +1 is to ofset the exclusiveness of gen_range and the 16 to have a slight bias for higher values)
+    min(
+        max_inclusive,
+        thread_rng().gen_range(1, max_inclusive + 1 + 16),
+    )
 }
 
 /// copies `from[..n]` to `to[..n]`
@@ -582,19 +611,17 @@ fn write_n_to_slice(from: &[u8], to: &mut [u8], n: usize) {
 }
 
 fn delayed_waker() -> mpsc::UnboundedSender<Task> {
-
     let (tx, rx) = mpsc::unbounded();
     thread::spawn(move || {
-        let pipe = rx
-            .for_each(|task: Task| {
-                //sleep some smallish random time
-                //sleep between ~ 0ms - 4ms
-                let nanos = random::<u32>() / 1000;
-                thread::sleep(Duration::new(0, nanos));
+        let pipe = rx.for_each(|task: Task| {
+            //sleep some smallish random time
+            //sleep between ~ 0ms - 4ms
+            let nanos = random::<u32>() / 1000;
+            thread::sleep(Duration::new(0, nanos));
 
-                task.notify();
-                future::ok::<(),()>(())
-            });
+            task.notify();
+            future::ok::<(), ()>(())
+        });
 
         pipe.wait().unwrap()
     });
@@ -605,13 +632,13 @@ fn delayed_waker() -> mpsc::UnboundedSender<Task> {
 #[cfg(test)]
 mod test {
     #![allow(non_snake_case)]
-    use std::time::Duration;
     use std::thread;
+    use std::time::Duration;
 
-    use futures::{future, Future};
     use futures::sync::oneshot;
+    use futures::{future, Future};
 
-    fn time_out(secs: u64) -> Box<Future<Item=(), Error=()>> {
+    fn time_out(secs: u64) -> Box<dyn Future<Item = (), Error = ()>> {
         let (tx, rx) = oneshot::channel();
         thread::spawn(move || {
             thread::sleep(Duration::new(secs, 0));
@@ -677,21 +704,22 @@ mod test {
             match fut.select2(time_out(1)).wait() {
                 Ok(future::Either::A(_)) => (),
                 Ok(future::Either::B(_)) => panic!("time out occured"),
-                Err(_e) => unreachable!()
+                Err(_e) => unreachable!(),
             }
         }
     }
 
     mod ActionData {
-        use std::panic;
         use super::super::ActionData;
+        use std::panic;
 
         fn should_fail<FN>(func: FN)
-            where FN: panic::UnwindSafe + FnOnce()
+        where
+            FN: panic::UnwindSafe + FnOnce(),
         {
             match panic::catch_unwind(func) {
                 Ok(_) => panic!("closure should have paniced"),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
 
@@ -712,19 +740,14 @@ mod test {
 
             #[test]
             fn len_lines() {
-                let lines = ActionData::Lines(vec![
-                    "123",
-                    "678"
-                ]);
+                let lines = ActionData::Lines(vec!["123", "678"]);
 
                 assert_eq!(lines.len(), 10)
             }
-
         }
 
         mod assert_start_same {
             use super::*;
-
 
             #[test]
             fn blob_smaller_other() {
@@ -753,7 +776,6 @@ mod test {
                 let lines = ActionData::Lines(vec!["123", "678"]);
                 lines.assert_same_start(b"123\r\n678\r\n" as &[u8]);
                 should_fail(|| lines.assert_same_start(b"123\r\n678\r\r" as &[u8]));
-
             }
 
             #[test]
@@ -781,13 +803,14 @@ mod test {
                 let waker = delayed_waker();
                 let mut socket = MockSocket::new(vec![]);
                 socket.state = State::ServerIsWorking {
-                    waker, to_be_read: BytesMut::new()
+                    waker,
+                    to_be_read: BytesMut::new(),
                 };
 
-                let _res = future
-                    ::poll_fn(|| socket.shutdown())
-                    .select(time_out(1)
-                        .then(|_| -> Result<(), std_io::Error> { panic!("timeout") }))
+                let _res = future::poll_fn(|| socket.shutdown())
+                    .select(
+                        time_out(1).then(|_| -> Result<(), std_io::Error> { panic!("timeout") }),
+                    )
                     .wait();
             }
 
@@ -795,21 +818,18 @@ mod test {
             fn on_done_conversation() {
                 let mut socket = MockSocket::new(vec![]);
 
-                let res = future
-                    ::poll_fn(|| socket.shutdown())
-                    .select(time_out(1)
-                        .then(|_| -> Result<(), std_io::Error> { panic!("timeout") }))
+                let res = future::poll_fn(|| socket.shutdown())
+                    .select(
+                        time_out(1).then(|_| -> Result<(), std_io::Error> { panic!("timeout") }),
+                    )
                     .wait();
 
                 match res {
                     Ok(_) => (),
-                    Err((err, _)) => panic!("unexpected error {:?}", err)
+                    Err((err, _)) => panic!("unexpected error {:?}", err),
                 }
             }
-
         }
-
-
 
         #[test]
         fn with_simple_session() {
@@ -821,14 +841,12 @@ mod test {
                 (Client, Blob("quit\r\n".as_bytes().to_owned())),
             ]));
 
-
-            let buf = &mut [0u8, 0, 0, 0] as &mut [u8];
-            let mut expect = b"hy there\r\n" as &[u8];
-
-            let fut = future
-                ::poll_fn(move || -> Poll<Option<MockSocket>, std_io::Error> {
+            let fut = future::poll_fn({
+                let mut buf = Box::new([0u8, 0, 0, 0]) as Box<[u8]>;
+                let mut expect = b"hy there\r\n" as &[u8];
+                move || -> Poll<Option<MockSocket>, std_io::Error> {
                     loop {
-                        let n = try_ready!(socket.as_mut().unwrap().poll_read(buf));
+                        let n = try_ready!(socket.as_mut().unwrap().poll_read(&mut buf));
 
                         assert!(n > 0);
                         let read = &buf[..n];
@@ -840,33 +858,35 @@ mod test {
                             return Ok(Async::Ready(socket.take()));
                         }
                     }
-                })
-                .and_then(|mut socket| future::poll_fn(move || {
+                }
+            })
+            .and_then(|mut socket| {
+                future::poll_fn({
                     let mut bytes = Bytes::from("quit\r\n");
-
-                    loop {
+                    move || loop {
                         let n = try_ready!(socket.as_mut().unwrap().poll_write(&bytes));
 
                         assert!(n > 0);
                         bytes.advance(n);
                         if bytes.is_empty() {
-                            return Ok(Async::Ready(socket.take()))
+                            return Ok(Async::Ready(socket.take()));
                         }
                     }
-                }))
-                .and_then(|mut socket| future::poll_fn(move || {
+                })
+            })
+            .and_then(|mut socket| {
+                future::poll_fn(move || {
                     try_ready!(socket.as_mut().unwrap().shutdown());
                     Ok(Async::Ready(()))
-                }))
-                .select2(time_out(1));
+                })
+            })
+            .select2(time_out(1));
 
             match fut.wait() {
                 Ok(future::Either::A(_)) => (),
                 Ok(future::Either::B(((), _))) => panic!("timeout"),
-                Err(_e) => unreachable!()
+                Err(_e) => unreachable!(),
             }
-
-
         }
     }
 }

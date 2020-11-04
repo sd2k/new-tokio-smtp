@@ -1,14 +1,11 @@
-use std::io as std_io;
-use std::mem;
+use std::{io as std_io, mem};
 
 use bytes::BufMut;
-use futures::{Poll, Future, Async};
+use futures::{Async, Future, Poll};
 use tokio::io::AsyncRead;
 
-use ::response::parser;
-use ::error::check_response;
-
 use super::{Io, SmtpResult, INPUT_BUFFER_INC_SIZE};
+use crate::{error::check_response, response::parser};
 
 impl Io {
     /// parse a "normal" smtp response
@@ -22,7 +19,6 @@ impl Io {
         }
         Parsing::new(self)
     }
-
 
     /// read data from the socket to buffer.input until it would block or the socket closed
     ///
@@ -41,30 +37,28 @@ impl Io {
                 Ok(Async::NotReady) => return Ok(ReadState::NotReady),
                 Ok(Async::Ready(0)) => return Ok(ReadState::SocketClosed),
                 Ok(Async::Ready(_)) => (),
-                Err(err) => return Err(err)
+                Err(err) => return Err(err),
             }
         }
     }
-
 
     /// # Implementation Limitations
     ///
     /// Be aware that try_read_line does only work on continuous buffers.
     /// I.e. it would fail if `self.in_buffer()` is a `Chain`
-    pub fn try_pop_line<F, R, E>(&mut self, parse_line_fn: F)
-                                 -> Result<Option<R>, E>
-        where F: FnOnce(&[u8]) -> Result<R, E>
+    pub fn try_pop_line<F, R, E>(&mut self, parse_line_fn: F) -> Result<Option<R>, E>
+    where
+        F: FnOnce(&[u8]) -> Result<R, E>,
     {
         let input = self.in_buffer();
 
-        let eol = (&*input)
-            .windows(2)
-            .enumerate()
-            .find(|&(_idx, pair)| pair == b"\r\n")
-            .map(|(idx, _)| idx);
+        let eol = (&*input).windows(2).position(|pair| pair == b"\r\n");
 
         if let Some(eol) = eol {
-            let parsed = parse_line_fn(&input[..eol])?;
+            let line = &input[..eol];
+            #[cfg(feature = "log")]
+            log_facade::trace!("S: {:?}", String::from_utf8_lossy(line));
+            let parsed = parse_line_fn(line)?;
             input.advance(eol + 2);
             Ok(Some(parsed))
         } else {
@@ -93,7 +87,6 @@ pub enum ReadState {
 }
 
 impl ReadState {
-
     pub fn is_socket_closed(self) -> bool {
         self == ReadState::SocketClosed
     }
@@ -102,14 +95,14 @@ impl ReadState {
 /// future returned by `Connection.parse_result`
 pub struct Parsing {
     inner: Option<Io>,
-    lines: Vec<parser::ResponseLine>
+    lines: Vec<parser::ResponseLine>,
 }
 
 impl Parsing {
     pub(crate) fn new(inner: Io) -> Self {
         Parsing {
             inner: Some(inner),
-            lines: Vec::new()
+            lines: Vec::new(),
         }
     }
 
@@ -121,7 +114,7 @@ impl Parsing {
         loop {
             let opt_line = self
                 .io_mut()
-                .try_pop_line(|line| parser::parse_line(line) )?;
+                .try_pop_line(|line| parser::parse_line(line))?;
 
             if let Some(line) = opt_line {
                 let last = line.last_line;
@@ -137,7 +130,6 @@ impl Parsing {
                 let io = self.inner.take().expect("[BUG] poll after completion");
                 //FIXME[buf_management]: maybe normalize output bufer to have at most cap of 1024
                 return Ok(Some((io, check_response(response))));
-
             } else {
                 return Ok(None);
             }
@@ -157,21 +149,16 @@ impl Future for Parsing {
         match self.read_result() {
             Ok(Some(result)) => return Ok(Async::Ready(result)),
             Ok(None) => (),
-            Err(err) => return Err(std_io::Error::new(
-                std_io::ErrorKind::InvalidData, err
-            ))
+            Err(err) => return Err(std_io::Error::new(std_io::ErrorKind::InvalidData, err)),
         }
 
         //3. if not see if the socked was closed
         match state {
-            ReadState::NotReady => return Ok(Async::NotReady),
-            ReadState::SocketClosed => {
-                return Err(std_io::Error::new(
-                    std_io::ErrorKind::ConnectionAborted,
-                    "socked closed before getting full smtp response",
-                ));
-            }
+            ReadState::NotReady => Ok(Async::NotReady),
+            ReadState::SocketClosed => Err(std_io::Error::new(
+                std_io::ErrorKind::ConnectionAborted,
+                "socked closed before getting full smtp response",
+            )),
         }
     }
 }
-

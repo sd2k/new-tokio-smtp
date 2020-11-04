@@ -1,24 +1,29 @@
 //! error module
-use std::{io as std_io};
-use std::error::Error;
-use std::fmt::{self, Display, Debug};
-use ::data_types::{Capability, EsmtpKeyword};
-use ::response::Response;
+use std::{
+    error::Error,
+    fmt::{self, Debug, Display},
+    io as std_io,
+};
+
+use crate::{
+    data_types::{Capability, EsmtpKeyword},
+    response::Response,
+};
 
 #[derive(Debug)]
 pub enum GeneralError {
     Connecting(ConnectingFailed),
     Cmd(LogicError),
-    Io(std_io::Error)
+    Io(std_io::Error),
 }
 
 impl Display for GeneralError {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::GeneralError::*;
-        match *self {
-            Connecting(ref err) => write!(fter, "Connecting failed: {}", err),
-            Cmd(ref err) => write!(fter, "A command failed: {}", err),
-            Io(ref err) => write!(fter, "I/O-Error: {}", err),
+        match self {
+            Connecting(err) => write!(fter, "Connecting failed: {}", err),
+            Cmd(err) => write!(fter, "A command failed: {}", err),
+            Io(err) => write!(fter, "I/O-Error: {}", err),
         }
     }
 }
@@ -53,7 +58,7 @@ pub enum ConnectingFailed {
     Setup(LogicError),
 
     /// the authentication command failed
-    Auth(LogicError)
+    Auth(LogicError),
 }
 
 impl From<std_io::Error> for ConnectingFailed {
@@ -64,15 +69,15 @@ impl From<std_io::Error> for ConnectingFailed {
 
 impl Error for ConnectingFailed {
     fn description(&self) -> &str {
-       "connecting with server failed"
+        "connecting with server failed"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         use self::ConnectingFailed::*;
-        match *self {
-            Io(ref err) => Some(err),
-            Setup(ref err) => Some(err),
-            Auth(ref err) => Some(err)
+        match self {
+            Io(err) => Some(err),
+            Setup(err) => Some(err),
+            Auth(err) => Some(err),
         }
     }
 }
@@ -80,10 +85,10 @@ impl Error for ConnectingFailed {
 impl Display for ConnectingFailed {
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::ConnectingFailed::*;
-        match *self {
-            Io(ref err) => write!(fter, "I/O-Error: {}", err),
-            Setup(ref err) => write!(fter, "Setup-Error: {}", err),
-            Auth(ref err) => write!(fter, "Authentication-Error: {}", err)
+        match self {
+            Io(err) => write!(fter, "I/O-Error: {}", err),
+            Setup(err) => write!(fter, "Setup-Error: {}", err),
+            Auth(err) => write!(fter, "Authentication-Error: {}", err),
         }
     }
 }
@@ -119,10 +124,10 @@ pub enum LogicError {
     /// This is meant to be produced by a custom command, as the sender of the command knows
     /// (at some abstraction level) which command it send, it can downcast and handle the
     /// error
-    Custom(Box<Error + 'static + Send + Sync>),
+    Custom(Box<dyn Error + 'static + Send + Sync>),
 
     /// command can not be used, as the server does not promotes the necessary capabilities
-    MissingCapabilities(MissingCapabilities)
+    MissingCapabilities(MissingCapabilities),
 }
 
 impl From<MissingCapabilities> for LogicError {
@@ -131,38 +136,30 @@ impl From<MissingCapabilities> for LogicError {
     }
 }
 
-
-
 impl Error for LogicError {
-
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         use self::LogicError::*;
-        match *self {
-            Code(_) => "server responded with error response code",
-            UnexpectedCode(_) => "server responded with unexpected non-error response code",
-            MissingCapabilities(ref err) => err.description(),
-            Custom(ref boxed) => boxed.description()
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        use self::LogicError::*;
-        match *self {
-            Custom(ref boxed) => boxed.cause(),
-            _ => None
+        match self {
+            Custom(boxed) => boxed.source(),
+            _ => None,
         }
     }
 }
 
 impl Display for LogicError {
-
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         use self::LogicError::*;
 
-        match *self {
-            Custom(ref boxed) => Display::fmt(boxed, fter),
-            //FIXME better display impl
-            _ => Debug::fmt(self, fter),
+        match self {
+            Custom(boxed) => Display::fmt(&boxed, fter),
+            //FIXME print response code and error message!
+            Code(_response) => write!(fter, "server responded with error response code"),
+            UnexpectedCode(_response) => write!(
+                fter,
+                "server responded with unexpected non-error response code"
+            ),
+            //FIXME print which capabilities are missing
+            MissingCapabilities(_caps) => write!(fter, "server is missing required capabilities"),
         }
     }
 }
@@ -173,17 +170,17 @@ impl Display for LogicError {
 /// e.g. the response does not contain the ehlo keyword `SMTPUTF8`
 #[derive(Debug, Clone)]
 pub struct MissingCapabilities {
-    capabilities: Vec<Capability>
+    capabilities: Vec<Capability>,
 }
 
 impl MissingCapabilities {
-
     pub fn new_from_unchecked<I>(data: I) -> Self
-        where I: Into<String>
+    where
+        I: Into<String>,
     {
-        MissingCapabilities::new(vec![
-            Capability::from(EsmtpKeyword::from_unchecked(data.into()))
-        ])
+        MissingCapabilities::new(vec![Capability::from(EsmtpKeyword::from_unchecked(
+            data.into(),
+        ))])
     }
 
     pub fn new(capabilities: Vec<Capability>) -> Self {
@@ -215,7 +212,6 @@ impl Error for MissingCapabilities {
 }
 
 impl Display for MissingCapabilities {
-
     fn fmt(&self, fter: &mut fmt::Formatter) -> fmt::Result {
         write!(fter, "missing capabilities:")?;
         let mut first = true;
